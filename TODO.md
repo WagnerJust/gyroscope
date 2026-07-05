@@ -18,15 +18,15 @@
   - [x] Config format: JSON (`gyroscope.json`), stdlib-only
   - [x] Skill invocation: user-invoked (`disable-model-invocation`)
   - [x] Standard adds `docs/agents/`; `CONTEXT.md` seeded from interview
-  - [ ] Interview: the question set `gyroscope init` asks
-  - [ ] The standard: concrete default spokes + templates
-  - [ ] Customization: how users add/drop spokes
-  - [ ] Distribution: `go install` / goreleaser / skills.sh?
-  - [ ] Tool targets beyond Claude Code
+  - [x] Interview: the question set — 5 questions live in `skill/SKILL.md`
+  - [x] The standard: concrete default spokes + templates → `templates/`
+  - [~] Customization: DROP spokes via `gyroscope.json` ✓; ADD custom spokes = in progress
+  - [x] Distribution: `go install` + goreleaser (T9)
+  - [x] Tool targets — MVP ships Claude + Gemini pointers; more deferred (see Later)
 - [x] Draft the standard's templates + interview script → `.local/drafts/`
 - [ ] Reconcile drafted standard with plumbline ACMM rubric (draft-now-reconcile-later)
 - [x] Implementation plan written → `.local/plans/2026-07-04-gyroscope-mvp-plan.md`
-- [ ] Final design sign-off → begin build
+- [x] Final design sign-off → begin build (built, reviewed, dogfooded)
 
 ## Next — MVP build (after sign-off)
 - [x] T1 Scaffold: `go.mod`, `embed.go`, templates, skill — commit `5801269`, build+vet green
