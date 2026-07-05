@@ -38,6 +38,7 @@ func newInitCmd(stdout io.Writer) *cobra.Command {
 			if err != nil {
 				return errCannotRun(err)
 			}
+			hookCmd := enforce.SessionStartCommand(hookPathsFor(cfg)...)
 
 			if !apply {
 				fmt.Fprintf(stdout, "gyroscope init (dry-run)\n  repo: %s\n", abs)
@@ -47,7 +48,12 @@ func newInitCmd(stdout io.Writer) *cobra.Command {
 				for _, t := range target.All() {
 					fmt.Fprintf(stdout, "  write: %s (pointer)\n", t.Path)
 				}
-				fmt.Fprintf(stdout, "  merge: .claude/settings.json (SessionStart hook)\n")
+				// Write() appends .local/ to .gitignore only when a local-spoke
+				// file is written; surface that mutation honestly.
+				if cfg.Spokes.Local {
+					fmt.Fprintf(stdout, "  update: .gitignore (ensure .local/ is listed)\n")
+				}
+				fmt.Fprintf(stdout, "  merge: .claude/settings.json — SessionStart hook: %s\n", hookCmd)
 				fmt.Fprintln(stdout, "\nNothing written. Re-run with --apply.")
 				return nil
 			}
@@ -71,14 +77,6 @@ func newInitCmd(stdout io.Writer) *cobra.Command {
 				}
 				fmt.Fprintf(stdout, "wrote %s (pointer)\n", t.Path)
 			}
-			hookPaths := []string{"AGENTS.md"}
-			if cfg.Spokes.Agents {
-				hookPaths = append(hookPaths, "docs/agents.md")
-			}
-			if cfg.Spokes.Local {
-				hookPaths = append(hookPaths, ".local/local.md")
-			}
-			hookCmd := enforce.SessionStartCommand(hookPaths...)
 			changed, err := (enforce.Claude{}).Install(abs, hookCmd)
 			if err != nil {
 				return errCannotRun(err)
@@ -95,6 +93,20 @@ func newInitCmd(stdout io.Writer) *cobra.Command {
 	f.BoolVar(&apply, "apply", false, "Actually write (default is dry-run).")
 	f.BoolVarP(&force, "force", "f", false, "Overwrite existing files.")
 	return cmd
+}
+
+// hookPathsFor returns the repo-relative files the SessionStart hook should cat:
+// always the hub, plus the agents-instructions and local-notes spokes when they
+// are enabled. The context/adr/personas spokes are not catted by the hook.
+func hookPathsFor(cfg config.Config) []string {
+	paths := []string{"AGENTS.md"}
+	if cfg.Spokes.Agents {
+		paths = append(paths, "docs/agents.md")
+	}
+	if cfg.Spokes.Local {
+		paths = append(paths, ".local/local.md")
+	}
+	return paths
 }
 
 // existingCollisions returns the repo-relative destinations that init would

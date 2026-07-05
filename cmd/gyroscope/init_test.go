@@ -17,8 +17,42 @@ func TestInitDryRunWritesNothing(t *testing.T) {
 	if _, err := os.Stat(filepath.Join(dir, "AGENTS.md")); !os.IsNotExist(err) {
 		t.Fatal("dry-run must not write AGENTS.md")
 	}
-	if !strings.Contains(out.String(), "dry-run") {
-		t.Fatalf("expected dry-run notice, got: %s", out.String())
+	s := out.String()
+	if !strings.Contains(s, "dry-run") {
+		t.Fatalf("expected dry-run notice, got: %s", s)
+	}
+	// The dry-run must surface the exact hook command that runs every session.
+	if !strings.Contains(s, "cat AGENTS.md") {
+		t.Fatalf("dry-run should show the SessionStart hook command, got: %s", s)
+	}
+	// Default config → local spoke on → init mutates .gitignore; surface it.
+	if !strings.Contains(s, ".gitignore") {
+		t.Fatalf("dry-run should note the .gitignore mutation, got: %s", s)
+	}
+}
+
+func TestInitDryRunOmitsGitignoreWhenLocalDisabled(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "gyroscope.json"), []byte(`{"spokes":{"local":false}}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	var out, errb bytes.Buffer
+	if err := run([]string{"init", dir}, &out, &errb); err != nil {
+		t.Fatalf("run: %v (%s)", err, errb.String())
+	}
+	s := out.String()
+	if strings.Contains(s, ".gitignore") {
+		t.Fatalf("dry-run must not note .gitignore when local spoke is off, got: %s", s)
+	}
+	if strings.Contains(s, ".local/local.md") {
+		t.Fatalf("dry-run hook must not include a disabled spoke, got: %s", s)
+	}
+	// Still writes nothing.
+	if _, err := os.Stat(filepath.Join(dir, "AGENTS.md")); !os.IsNotExist(err) {
+		t.Fatal("dry-run must not write AGENTS.md")
+	}
+	if _, err := os.Stat(filepath.Join(dir, ".claude", "settings.json")); !os.IsNotExist(err) {
+		t.Fatal("dry-run must not write settings.json")
 	}
 }
 
