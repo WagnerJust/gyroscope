@@ -15,6 +15,16 @@ import (
 
 type Config struct {
 	Spokes SpokeSet `json:"spokes"`
+	// Custom lists extra spoke doc files beyond the built-in five. Absent means
+	// none; the writer skips any entry missing a Name or Dest.
+	Custom []CustomSpoke `json:"custom"`
+}
+
+// CustomSpoke is a user-defined spoke: a doc file gyroscope scaffolds and routes
+// from the hub. The route is auto-generated from Name and Dest.
+type CustomSpoke struct {
+	Name string `json:"name"`
+	Dest string `json:"dest"`
 }
 
 type SpokeSet struct {

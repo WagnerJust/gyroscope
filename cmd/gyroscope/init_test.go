@@ -76,6 +76,31 @@ func TestInitApplyWritesStandardPointerAndHook(t *testing.T) {
 	}
 }
 
+func TestInitApplyWritesCustomSpokeAndRoute(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "gyroscope.json"), []byte(`{"custom":[{"name":"Security","dest":"docs/security.md"}]}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	var out, errb bytes.Buffer
+	if err := run([]string{"init", dir, "--apply"}, &out, &errb); err != nil {
+		t.Fatalf("run: %v (%s)", err, errb.String())
+	}
+	if _, err := os.Stat(filepath.Join(dir, "docs", "security.md")); err != nil {
+		t.Errorf("apply should have written the custom spoke docs/security.md: %v", err)
+	}
+	b, err := os.ReadFile(filepath.Join(dir, "AGENTS.md"))
+	if err != nil {
+		t.Fatalf("read AGENTS.md: %v", err)
+	}
+	got := string(b)
+	if !strings.Contains(got, "docs/security.md") || !strings.Contains(got, "**Security**") {
+		t.Fatalf("AGENTS.md should route to the custom spoke, got:\n%s", got)
+	}
+	if strings.Contains(got, "gyroscope:custom-routes") {
+		t.Fatalf("AGENTS.md must not contain the raw marker, got:\n%s", got)
+	}
+}
+
 func TestInitApplyConfigAwareHookOmitsDisabledSpoke(t *testing.T) {
 	dir := t.TempDir()
 	if err := os.WriteFile(filepath.Join(dir, "gyroscope.json"), []byte(`{"spokes":{"local":false}}`), 0o644); err != nil {

@@ -45,9 +45,45 @@ func Plan(cfg config.Config) ([]File, error) {
 		if err != nil {
 			return nil, fmt.Errorf("read template %s: %w", e.tmpl, err)
 		}
+		if e.dest == "AGENTS.md" {
+			b = renderCustomRoutes(b, cfg.Custom)
+		}
 		files = append(files, File{Dest: e.dest, Content: b})
 	}
+	// Custom spokes ride as ordinary Files so they flow through Write, the dry-run
+	// listing, and the collision check. Skip forgiving on missing Name/Dest.
+	for _, c := range cfg.Custom {
+		if c.Name == "" || c.Dest == "" {
+			continue
+		}
+		files = append(files, File{Dest: c.Dest, Content: customStub(c.Name)})
+	}
 	return files, nil
+}
+
+// customRouteMarker is the single insertion point in templates/AGENTS.md where
+// per-repo custom-spoke routes are rendered. It is a comment (not a `{{...}}`
+// fill-once placeholder) so it never trips the skill's fill check or embed_test.
+const customRouteMarker = "<!-- gyroscope:custom-routes -->\n"
+
+// renderCustomRoutes replaces the marker line in the hub with one route bullet
+// per custom spoke (skipping entries missing a Name or Dest), or removes it
+// cleanly when there are none — a single contained replacement, no templating.
+func renderCustomRoutes(hub []byte, custom []config.CustomSpoke) []byte {
+	var b strings.Builder
+	for _, c := range custom {
+		if c.Name == "" || c.Dest == "" {
+			continue
+		}
+		fmt.Fprintf(&b, "- **%s** → `%s`\n", c.Name, c.Dest)
+	}
+	return []byte(strings.Replace(string(hub), customRouteMarker, b.String(), 1))
+}
+
+func customStub(name string) []byte {
+	return []byte("# " + name + "\n\n" +
+		"{{What this spoke covers — one or two lines. gyroscope created the file; the\n" +
+		"/gyroscope skill (or you) fills this in.}}\n")
 }
 
 // Write creates each planned file under repoDir, refusing to clobber an existing

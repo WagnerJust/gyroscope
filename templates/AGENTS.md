@@ -11,6 +11,7 @@
 - **Your** personal setup / stack (may differ from repo defaults) → `.local/local.md` (gitignored; may not exist).
 - **Why the code is shaped this way** → `docs/adr/` (architecture decisions).
 - **Specialized agent personas for this repo** → `docs/agents/`.
+<!-- gyroscope:custom-routes -->
 
 ## Pointer files
 
