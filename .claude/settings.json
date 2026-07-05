@@ -1,0 +1,14 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "command": "cat AGENTS.md docs/agents.md .local/local.md 2>/dev/null",
+            "type": "command"
+          }
+        ]
+      }
+    ]
+  }
+}
