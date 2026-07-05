@@ -15,3 +15,14 @@ isn't left to chance.
     # or non-interactively:
     gyroscope init            # dry-run: show what would be written
     gyroscope init --apply    # write the standard + pointer + hook
+
+## Configure (optional)
+
+Every spoke is on by default. To disable one, add `gyroscope.json` at the repo root:
+
+    {"spokes": {"adr": false, "personas": false}}
+
+Spokes: `context` (CONTEXT.md), `agents` (docs/agents.md), `adr` (docs/adr/),
+`personas` (docs/agents/), `local` (.local/local.md). The `AGENTS.md` hub is always written.
+
+`gyroscope init --apply` refuses to overwrite existing files; pass `--force` to overwrite.
