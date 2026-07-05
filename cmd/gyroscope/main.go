@@ -54,7 +54,7 @@ func run(args []string, stdout, stderr io.Writer) error {
 	}
 	root.SetOut(stdout)
 	root.SetErr(stderr)
-	root.Version = fmt.Sprintf("%s (commit %s, built %s)", version, commit, date)
+	root.Version = versionString(version, commit, date)
 	root.AddCommand(newInitCmd(stdout))
 	root.AddCommand(newVersionCmd(stdout))
 	root.AddCommand(newInstallSkillCmd(stdout))
