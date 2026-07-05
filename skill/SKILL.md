@@ -29,16 +29,31 @@ Ask relentlessly, ONE question per message, recommending an answer each time. Wa
 each branch to the end before moving on. Asking several at once is bewildering.
 Gather:
 
-1. **Project one-liner** — what is this repo, in a sentence? _(seeds `AGENTS.md`, `CONTEXT.md`)_
-2. **Domain terms agents get wrong** — words used two ways, jargon to pin down. _(seeds `CONTEXT.md`)_
-3. **Build & test** — how to build; the test command that gates "done". _(seeds `docs/agents.md`)_
-4. **Conventions & do-nots** — key patterns and explicit no-gos, each with its reason. _(seeds `docs/agents.md`)_
-5. **Spokes** — accept the default standard, or add/drop any? _(seeds the `gyroscope` config)_
+1. **Project one-liner** — what is this repo, in a sentence? _(fills `AGENTS.md`, `CONTEXT.md`)_
+2. **Domain terms agents get wrong** — words used two ways, jargon to pin down. _(fills `CONTEXT.md`)_
+3. **Build & test** — how to build; the test command that gates "done". _(fills `docs/agents.md`)_
+4. **Conventions & do-nots** — key patterns and explicit no-gos, each with its reason. _(fills `docs/agents.md`)_
+5. **Spokes** — accept the default standard, or add/drop any? _(sets the `gyroscope` config)_
 
-## Present, then install
+Keep track of which answer fills which file — the fill step below needs that mapping.
+Placeholders: `{{...}}` are yours to fill in step 3; `<...>` form fields in
+`docs/adr/TEMPLATE.md` stay.
+
+## Present, then install, then fill
 
 1. Show the gathered answers and the exact list of files to be written. Get approval.
 2. Run the binary to write the standard, reconcile pointer files to the one routing
    line, and install the `SessionStart` hook (merged into `.claude/settings.json`,
    never overwriting existing content).
-3. Confirm what landed and where.
+3. **Fill the scaffolds.** The binary writes them with `{{...}}` placeholders; you fill
+   them from the approved answers. For each written spoke — `CONTEXT.md`,
+   `docs/agents.md`, `docs/agents/README.md`, and the date in `docs/adr/0001-*` —
+   replace every `{{...}}` with the corresponding answer and delete the scaffold-guidance
+   `<!-- ... -->` comments. Do NOT invent content the interview didn't cover; drop a term
+   or leave a section terse rather than padding.
+   Leave `docs/adr/TEMPLATE.md` untouched — it is a blank form whose `<...>` fields are
+   filled per-ADR, not now.
+4. **Verify none remain.** `grep -rn '{{' AGENTS.md CONTEXT.md docs/` must come back empty
+   (every `{{...}}` is a fill-once placeholder; `<...>` in `TEMPLATE.md` is intentional and
+   is not matched). If anything remains, you skipped a spoke — go fill it.
+5. Confirm what landed and where.
