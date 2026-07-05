@@ -12,7 +12,7 @@ import (
 func TestInstallSkillWritesEmbeddedSkill(t *testing.T) {
 	dir := t.TempDir()
 	var out bytes.Buffer
-	if err := run([]string{"install-skill", "--dir", dir, "--apply"}, &out, &out); err != nil {
+	if err := run([]string{"install-skill", dir, "--apply"}, &out, &out); err != nil {
 		t.Fatalf("run: %v (%s)", err, out.String())
 	}
 	dest := filepath.Join(dir, "gyroscope", "SKILL.md")
@@ -22,5 +22,12 @@ func TestInstallSkillWritesEmbeddedSkill(t *testing.T) {
 	}
 	if !strings.Contains(string(b), "name: gyroscope") {
 		t.Fatal("written skill missing frontmatter")
+	}
+}
+
+func TestInstallSkillRejectsTooManyArgs(t *testing.T) {
+	var out bytes.Buffer
+	if err := run([]string{"install-skill", "a", "b", "--apply"}, &out, &out); err == nil {
+		t.Fatal("expected error for too many args, got nil")
 	}
 }

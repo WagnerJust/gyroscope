@@ -15,14 +15,15 @@ import (
 // (default ~/.claude/skills), the way buckle installs buckle's skill.
 func newInstallSkillCmd(stdout io.Writer) *cobra.Command {
 	var apply bool
-	var dir string
 	cmd := &cobra.Command{
-		Use:   "install-skill",
-		Short: "Install gyroscope's companion skill into your agent's skills dir.",
-		Args:  cobra.NoArgs,
-		RunE: func(*cobra.Command, []string) error {
-			base := dir
-			if base == "" {
+		Use:   "install-skill [skills-dir]",
+		Short: "Install gyroscope's companion skill into your agent's skills dir (default ~/.claude/skills).",
+		Args:  cobra.MaximumNArgs(1),
+		RunE: func(_ *cobra.Command, args []string) error {
+			var base string
+			if len(args) == 1 {
+				base = args[0]
+			} else {
 				home, err := os.UserHomeDir()
 				if err != nil {
 					return errCannotRun(err)
@@ -46,6 +47,5 @@ func newInstallSkillCmd(stdout io.Writer) *cobra.Command {
 	}
 	f := cmd.Flags()
 	f.BoolVar(&apply, "apply", false, "Actually write (default is dry-run).")
-	f.StringVar(&dir, "dir", "", "Skills base dir (default ~/.claude/skills).")
 	return cmd
 }
