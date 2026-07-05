@@ -11,7 +11,7 @@ import (
 
 // RoutingLine is the one canonical pointer body — identical across every target
 // so tool-specific files cannot drift.
-const RoutingLine = "Before doing anything else, read AGENTS.md and follow its routing table.\n"
+const RoutingLine = "Before doing anything else, read AGENTS.md and follow its routes.\n"
 
 type Target struct {
 	ID   string

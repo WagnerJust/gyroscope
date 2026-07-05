@@ -42,7 +42,10 @@ func newInitCmd(stdout, stderr io.Writer) *cobra.Command {
 				for _, f := range files {
 					fmt.Fprintf(stdout, "  write: %s\n", f.Dest)
 				}
-				fmt.Fprintf(stdout, "  write: CLAUDE.md (pointer)\n  merge: .claude/settings.json (SessionStart hook)\n")
+				for _, t := range target.All() {
+					fmt.Fprintf(stdout, "  write: %s (pointer)\n", t.Path)
+				}
+				fmt.Fprintf(stdout, "  merge: .claude/settings.json (SessionStart hook)\n")
 				fmt.Fprintln(stdout, "\nNothing written. Re-run with --apply.")
 				return nil
 			}
@@ -54,14 +57,12 @@ func newInitCmd(stdout, stderr io.Writer) *cobra.Command {
 			for _, w := range written {
 				fmt.Fprintf(stdout, "wrote %s\n", w)
 			}
-			ptr, ok := target.ByID("claude")
-			if !ok {
-				return errCannotRun(fmt.Errorf("no doc target registered for %q", "claude"))
+			for _, t := range target.All() {
+				if err := target.WritePointer(abs, t, force); err != nil {
+					return errCannotRun(err)
+				}
+				fmt.Fprintf(stdout, "wrote %s (pointer)\n", t.Path)
 			}
-			if err := target.WritePointer(abs, ptr, force); err != nil {
-				return errCannotRun(err)
-			}
-			fmt.Fprintf(stdout, "wrote %s (pointer)\n", ptr.Path)
 			changed, err := (enforce.Claude{}).Install(abs)
 			if err != nil {
 				return errCannotRun(err)

@@ -4,6 +4,8 @@
 
 ## Routes
 
+> Spokes are optional: if one is disabled in `gyroscope.json`, its route below points to a file that wasn't generated.
+
 - **Naming things / writing prose** → read `CONTEXT.md` first for the canonical vocabulary.
 - **Build, test, conventions** → `docs/agents.md`.
 - **Your** personal setup / stack (may differ from repo defaults) → `.local/local.md` (gitignored; may not exist).
@@ -15,3 +17,4 @@
 These defer to this hub — keep each to the single routing line:
 
 - `CLAUDE.md`
+- `GEMINI.md`

@@ -28,7 +28,7 @@ func TestInitApplyWritesStandardPointerAndHook(t *testing.T) {
 	if err := run([]string{"init", dir, "--apply"}, &out, &errb); err != nil {
 		t.Fatalf("run: %v (%s)", err, errb.String())
 	}
-	for _, want := range []string{"AGENTS.md", "CLAUDE.md", ".claude/settings.json", ".local/local.md"} {
+	for _, want := range []string{"AGENTS.md", "CLAUDE.md", "GEMINI.md", ".claude/settings.json", ".local/local.md"} {
 		if _, err := os.Stat(filepath.Join(dir, want)); err != nil {
 			t.Errorf("apply should have written %s: %v", want, err)
 		}
