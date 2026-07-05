@@ -49,6 +49,10 @@ func Plan(cfg config.Config) ([]File, error) {
 	return files, nil
 }
 
+// Write creates each planned file under repoDir, refusing to clobber an existing
+// file unless force is set, and appends ".local/" to .gitignore when a local-spoke
+// file is written. On error it returns early: written lists the files already
+// created — there is no rollback of partial progress.
 func Write(repoDir string, files []File, force bool) (written []string, err error) {
 	wroteLocal := false
 	for _, f := range files {

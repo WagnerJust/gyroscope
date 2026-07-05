@@ -3,6 +3,7 @@ package standard
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/WagnerJust/gyroscope/internal/config"
@@ -23,7 +24,7 @@ func TestWriteAllSpokesLandsFilesAndGitignoresLocal(t *testing.T) {
 		}
 	}
 	gi, _ := os.ReadFile(filepath.Join(dir, ".gitignore"))
-	if got := string(gi); got == "" || !contains(got, ".local/") {
+	if got := string(gi); got == "" || !strings.Contains(got, ".local/") {
 		t.Errorf(".gitignore should list .local/, got %q", got)
 	}
 }
@@ -51,13 +52,32 @@ func TestPlanDropsDisabledSpoke(t *testing.T) {
 	}
 }
 
-func contains(s, sub string) bool {
-	return len(s) >= len(sub) && (func() bool {
-		for i := 0; i+len(sub) <= len(s); i++ {
-			if s[i:i+len(sub)] == sub {
-				return true
-			}
+func TestWriteForceOverwritesExisting(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "AGENTS.md"), []byte("mine"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	files, err := Plan(config.Default())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := Write(dir, files, true); err != nil {
+		t.Fatalf("force write should succeed over existing file: %v", err)
+	}
+	got, err := os.ReadFile(filepath.Join(dir, "AGENTS.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(got) == "mine" {
+		t.Fatal("force should have overwritten the existing file")
+	}
+	var want []byte
+	for _, f := range files {
+		if f.Dest == "AGENTS.md" {
+			want = f.Content
 		}
-		return false
-	})()
+	}
+	if string(got) != string(want) {
+		t.Fatalf("force-written AGENTS.md should match template content")
+	}
 }
