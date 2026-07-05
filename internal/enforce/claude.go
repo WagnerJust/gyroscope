@@ -1,0 +1,101 @@
+// Package enforce is the enforcement-adapter registry: the few harnesses that can
+// run hooks. Each adapter installs a mechanism that makes agents actually read the
+// hub. The Claude adapter merges a SessionStart hook into .claude/settings.json,
+// preserving any existing settings, and is idempotent.
+package enforce
+
+import (
+	"bytes"
+	"encoding/json"
+	"fmt"
+	"os"
+	"path/filepath"
+)
+
+// SessionStartCommand injects the hub + instructions spoke + the developer's local
+// notes (if present) into context at session start.
+const SessionStartCommand = "cat AGENTS.md docs/agents.md .local/local.md 2>/dev/null"
+
+type Claude struct{}
+
+func (Claude) ID() string { return "claude" }
+
+// Install merges gyroscope's SessionStart hook into repoDir/.claude/settings.json.
+// Returns changed=false when the hook is already present.
+func (Claude) Install(repoDir string) (changed bool, err error) {
+	path := filepath.Join(repoDir, ".claude", "settings.json")
+	settings := map[string]any{}
+	if b, rerr := os.ReadFile(path); rerr == nil {
+		if err := json.Unmarshal(b, &settings); err != nil {
+			return false, err
+		}
+	} else if !os.IsNotExist(rerr) {
+		return false, rerr
+	}
+
+	// Fail loud rather than silently overwriting a settings file whose "hooks"
+	// (or "hooks.SessionStart") isn't the shape we merge into — that would drop
+	// the user's existing value on the next write.
+	if raw, ok := settings["hooks"]; ok {
+		if _, isMap := raw.(map[string]any); !isMap {
+			return false, fmt.Errorf("%s: %q is not a JSON object", path, "hooks")
+		}
+	}
+	hooks, _ := settings["hooks"].(map[string]any)
+	if hooks == nil {
+		hooks = map[string]any{}
+	}
+	if raw, ok := hooks["SessionStart"]; ok {
+		if _, isList := raw.([]any); !isList {
+			return false, fmt.Errorf("%s: %q is not a JSON array", path, "hooks.SessionStart")
+		}
+	}
+	list, _ := hooks["SessionStart"].([]any)
+	if present(list) {
+		return false, nil
+	}
+	hooks["SessionStart"] = append(list, map[string]any{
+		"hooks": []any{map[string]any{"type": "command", "command": SessionStartCommand}},
+	})
+	settings["hooks"] = hooks
+
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		return false, err
+	}
+	// Encode without HTML-escaping so a shell command like "2>/dev/null" is written
+	// literally rather than as "2>/dev/null". Encoder.Encode adds a trailing
+	// newline for us.
+	var buf bytes.Buffer
+	enc := json.NewEncoder(&buf)
+	enc.SetEscapeHTML(false)
+	enc.SetIndent("", "  ")
+	if err := enc.Encode(settings); err != nil {
+		return false, err
+	}
+	// Write to a sibling temp file then rename, so an interrupted write can never
+	// truncate the user's existing settings.json — a reader sees old or new, never
+	// a partial file.
+	tmp := path + ".gyroscope.tmp"
+	if err := os.WriteFile(tmp, buf.Bytes(), 0o644); err != nil {
+		return false, err
+	}
+	if err := os.Rename(tmp, path); err != nil {
+		os.Remove(tmp)
+		return false, err
+	}
+	return true, nil
+}
+
+func present(list []any) bool {
+	for _, e := range list {
+		m, _ := e.(map[string]any)
+		inner, _ := m["hooks"].([]any)
+		for _, h := range inner {
+			hm, _ := h.(map[string]any)
+			if cmd, _ := hm["command"].(string); cmd == SessionStartCommand {
+				return true
+			}
+		}
+	}
+	return false
+}
