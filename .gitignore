@@ -1,0 +1,13 @@
+# Local scratch: design docs/specs, chat & agent artifacts, exploration notes.
+# Never committed. The tracked surface is TODO.md + code + the docs gyroscope emits.
+.local/
+
+# Go build output
+/gyroscope
+/bin/
+*.test
+*.prof
+coverage.out
+
+# OS cruft
+.DS_Store
