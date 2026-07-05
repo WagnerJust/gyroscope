@@ -56,6 +56,7 @@ func run(args []string, stdout, stderr io.Writer) error {
 	root.Version = fmt.Sprintf("%s (commit %s, built %s)", version, commit, date)
 	root.AddCommand(newInitCmd(stdout, stderr))
 	root.AddCommand(newVersionCmd(stdout))
+	root.AddCommand(newInstallSkillCmd(stdout, stderr))
 	root.SetArgs(args)
 	if err := root.Execute(); err != nil {
 		// Cobra usage errors (bad flags/args, unknown command) come back unwrapped;
