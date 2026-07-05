@@ -56,6 +56,13 @@
 - [x] (df52737) #10 goreleaser custom `ldflags` drop the default `-s -w` → release binaries aren't stripped (larger, not wrong).
 - [x] (CI) gofmt gate added in CI (df52737). `.goreleaser.yaml` machine-validated: `goreleaser check` passes + `goreleaser build --snapshot` succeeds with correct ldflags. `dist/` gitignored.
 
+## Dogfood findings (gyroscope run on itself — adoption commit 7a3c577)
+- [x] (937a284) **SKILL never filled placeholders after `init`** — the headline promise (binary=structure, skill=content) was unimplemented. Added "Fill the scaffolds" + "Verify none remain" steps to `skill/SKILL.md`.
+- [x] (937a284) **`{{...}}` marker collision** — reserved `{{...}}` for fill-once scaffolds only; ADR `TEMPLATE.md` now uses `<...>` per-use form fields; `embed_test.go` guards the invariant.
+- [ ] Dry-run plan hides side effects — `init` appends `.local/` to `.gitignore`, and the hook `cat`s a gitignored personal file every session; neither is surfaced in the dry-run plan.
+- [ ] Config-aware enforcement — `SessionStartCommand` statically `cat`s all spoke paths even when a spoke is toggled off (degrades via `2>/dev/null`); static hub still lists disabled-spoke routes (overlaps review #1). Make the hub + hook config-aware.
+- [ ] `version` double-prints when untagged (`<sha> (commit <sha>, …)`) — collapse to one value or label `dev-<sha>`.
+
 ## Later — deferred (explicitly out of MVP)
 - [ ] plumbline audit-fit (coordinate; another dev owns the bridge)
 - [ ] Token reduction (evaluate `caveman`)
