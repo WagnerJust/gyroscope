@@ -21,7 +21,9 @@ func TestLoadAbsentReturnsDefaultAllOn(t *testing.T) {
 
 func TestLoadOverridesOnlyNamedSpoke(t *testing.T) {
 	dir := t.TempDir()
-	os.WriteFile(filepath.Join(dir, "gyroscope.json"), []byte(`{"spokes":{"local":false}}`), 0o644)
+	if err := os.WriteFile(filepath.Join(dir, "gyroscope.json"), []byte(`{"spokes":{"local":false}}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
 	cfg, err := Load(dir)
 	if err != nil {
 		t.Fatal(err)
@@ -31,5 +33,19 @@ func TestLoadOverridesOnlyNamedSpoke(t *testing.T) {
 	}
 	if !cfg.Spokes.Context {
 		t.Fatal("unnamed spokes must stay on")
+	}
+}
+
+func TestLoadMalformedJSONReturnsError(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "gyroscope.json"), []byte(`{"spokes":`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	cfg, err := Load(dir)
+	if err == nil {
+		t.Fatal("malformed JSON should return a non-nil error")
+	}
+	if cfg != (Config{}) {
+		t.Fatalf("malformed JSON should return zero Config{}, got %+v", cfg)
 	}
 }
