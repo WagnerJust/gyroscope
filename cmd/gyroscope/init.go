@@ -3,7 +3,9 @@ package main
 import (
 	"fmt"
 	"io"
+	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/spf13/cobra"
 
@@ -50,6 +52,12 @@ func newInitCmd(stdout, stderr io.Writer) *cobra.Command {
 				return nil
 			}
 
+			if !force {
+				if clashes := existingCollisions(abs, files); len(clashes) > 0 {
+					return errCannotRun(fmt.Errorf("refusing to overwrite existing files (use --force): %s", strings.Join(clashes, ", ")))
+				}
+			}
+
 			written, err := standard.Write(abs, files, force)
 			if err != nil {
 				return errCannotRun(err)
@@ -79,4 +87,26 @@ func newInitCmd(stdout, stderr io.Writer) *cobra.Command {
 	f.BoolVar(&apply, "apply", false, "Actually write (default is dry-run).")
 	f.BoolVarP(&force, "force", "f", false, "Overwrite existing files.")
 	return cmd
+}
+
+// existingCollisions returns the repo-relative destinations that init would
+// write with O_EXCL (standard files plus pointer files) but which already
+// exist under abs. It intentionally excludes .claude/settings.json, which is
+// installed via a preserving merge rather than a clobbering write. A non-empty
+// result means --apply (without --force) must refuse before writing anything.
+func existingCollisions(abs string, files []standard.File) []string {
+	var clashes []string
+	dests := make([]string, 0, len(files)+len(target.All()))
+	for _, f := range files {
+		dests = append(dests, f.Dest)
+	}
+	for _, t := range target.All() {
+		dests = append(dests, t.Path)
+	}
+	for _, d := range dests {
+		if _, err := os.Stat(filepath.Join(abs, d)); err == nil {
+			clashes = append(clashes, d)
+		}
+	}
+	return clashes
 }

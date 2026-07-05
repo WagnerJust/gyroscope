@@ -42,6 +42,29 @@ func TestInitApplyWritesStandardPointerAndHook(t *testing.T) {
 	}
 }
 
+func TestInitApplyIsAllOrNothing(t *testing.T) {
+	dir := t.TempDir()
+	// Pre-existing file that collides with one of the pointers (not the first standard file),
+	// to prove NOTHING is written when any target collides.
+	if err := os.WriteFile(filepath.Join(dir, "GEMINI.md"), []byte("mine"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	var out, errb bytes.Buffer
+	if err := run([]string{"init", dir, "--apply"}, &out, &errb); err == nil {
+		t.Fatal("expected refusal when a target already exists")
+	}
+	// Nothing else should have been written — AGENTS.md / CLAUDE.md / .claude must be absent.
+	for _, p := range []string{"AGENTS.md", "CLAUDE.md", ".claude/settings.json"} {
+		if _, err := os.Stat(filepath.Join(dir, p)); !os.IsNotExist(err) {
+			t.Errorf("all-or-nothing violated: %s exists", p)
+		}
+	}
+	// The pre-existing file is untouched.
+	if b, _ := os.ReadFile(filepath.Join(dir, "GEMINI.md")); string(b) != "mine" {
+		t.Fatal("existing file must be untouched")
+	}
+}
+
 func TestInitApplyRefusesOverwriteWithoutForce(t *testing.T) {
 	dir := t.TempDir()
 	var out, errb bytes.Buffer
