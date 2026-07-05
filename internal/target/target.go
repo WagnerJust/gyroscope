@@ -4,9 +4,7 @@
 package target
 
 import (
-	"fmt"
-	"os"
-	"path/filepath"
+	"github.com/WagnerJust/gyroscope/internal/fsutil"
 )
 
 // RoutingLine is the one canonical pointer body — identical across every target
@@ -36,22 +34,5 @@ func ByID(id string) (Target, bool) {
 }
 
 func WritePointer(repoDir string, t Target, force bool) error {
-	dest := filepath.Join(repoDir, t.Path)
-	if err := os.MkdirAll(filepath.Dir(dest), 0o755); err != nil {
-		return err
-	}
-	flags := os.O_WRONLY | os.O_CREATE | os.O_EXCL
-	if force {
-		flags = os.O_WRONLY | os.O_CREATE | os.O_TRUNC
-	}
-	fh, err := os.OpenFile(dest, flags, 0o644)
-	if err != nil {
-		if os.IsExist(err) {
-			return fmt.Errorf("refusing to overwrite %s (use --force)", t.Path)
-		}
-		return err
-	}
-	defer fh.Close()
-	_, err = fh.WriteString(RoutingLine)
-	return err
+	return fsutil.WriteGuarded(repoDir, t.Path, []byte(RoutingLine), force)
 }

@@ -14,6 +14,7 @@ import (
 
 	gyroscope "github.com/WagnerJust/gyroscope"
 	"github.com/WagnerJust/gyroscope/internal/config"
+	"github.com/WagnerJust/gyroscope/internal/fsutil"
 )
 
 type File struct {
@@ -56,25 +57,8 @@ func Plan(cfg config.Config) ([]File, error) {
 func Write(repoDir string, files []File, force bool) (written []string, err error) {
 	wroteLocal := false
 	for _, f := range files {
-		dest := filepath.Join(repoDir, f.Dest)
-		if err := os.MkdirAll(filepath.Dir(dest), 0o755); err != nil {
+		if err := fsutil.WriteGuarded(repoDir, f.Dest, f.Content, force); err != nil {
 			return written, err
-		}
-		flags := os.O_WRONLY | os.O_CREATE | os.O_EXCL
-		if force {
-			flags = os.O_WRONLY | os.O_CREATE | os.O_TRUNC
-		}
-		fh, err := os.OpenFile(dest, flags, 0o644)
-		if err != nil {
-			if os.IsExist(err) {
-				return written, fmt.Errorf("refusing to overwrite %s (use --force)", f.Dest)
-			}
-			return written, err
-		}
-		_, werr := fh.Write(f.Content)
-		fh.Close()
-		if werr != nil {
-			return written, werr
 		}
 		written = append(written, f.Dest)
 		if strings.HasPrefix(f.Dest, ".local/") {
