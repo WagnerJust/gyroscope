@@ -5,6 +5,7 @@
 # Go build output
 /gyroscope
 /bin/
+/dist/
 *.test
 *.prof
 coverage.out
