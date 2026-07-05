@@ -71,7 +71,15 @@ func newInitCmd(stdout io.Writer) *cobra.Command {
 				}
 				fmt.Fprintf(stdout, "wrote %s (pointer)\n", t.Path)
 			}
-			changed, err := (enforce.Claude{}).Install(abs)
+			hookPaths := []string{"AGENTS.md"}
+			if cfg.Spokes.Agents {
+				hookPaths = append(hookPaths, "docs/agents.md")
+			}
+			if cfg.Spokes.Local {
+				hookPaths = append(hookPaths, ".local/local.md")
+			}
+			hookCmd := enforce.SessionStartCommand(hookPaths...)
+			changed, err := (enforce.Claude{}).Install(abs, hookCmd)
 			if err != nil {
 				return errCannotRun(err)
 			}

@@ -10,11 +10,14 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 )
 
-// SessionStartCommand injects the hub + instructions spoke + the developer's local
-// notes (if present) into context at session start.
-const SessionStartCommand = "cat AGENTS.md docs/agents.md .local/local.md 2>/dev/null"
+// SessionStartCommand builds the hook command that cats the given repo-relative
+// paths into the session at startup. 2>/dev/null so a missing spoke never errors.
+func SessionStartCommand(paths ...string) string {
+	return "cat " + strings.Join(paths, " ") + " 2>/dev/null"
+}
 
 type Claude struct{}
 
@@ -22,7 +25,7 @@ func (Claude) ID() string { return "claude" }
 
 // Install merges gyroscope's SessionStart hook into repoDir/.claude/settings.json.
 // Returns changed=false when the hook is already present.
-func (Claude) Install(repoDir string) (changed bool, err error) {
+func (Claude) Install(repoDir string, command string) (changed bool, err error) {
 	path := filepath.Join(repoDir, ".claude", "settings.json")
 	settings := map[string]any{}
 	if b, rerr := os.ReadFile(path); rerr == nil {
@@ -51,11 +54,11 @@ func (Claude) Install(repoDir string) (changed bool, err error) {
 		}
 	}
 	list, _ := hooks["SessionStart"].([]any)
-	if present(list) {
+	if present(list, command) {
 		return false, nil
 	}
 	hooks["SessionStart"] = append(list, map[string]any{
-		"hooks": []any{map[string]any{"type": "command", "command": SessionStartCommand}},
+		"hooks": []any{map[string]any{"type": "command", "command": command}},
 	})
 	settings["hooks"] = hooks
 
@@ -86,13 +89,13 @@ func (Claude) Install(repoDir string) (changed bool, err error) {
 	return true, nil
 }
 
-func present(list []any) bool {
+func present(list []any, command string) bool {
 	for _, e := range list {
 		m, _ := e.(map[string]any)
 		inner, _ := m["hooks"].([]any)
 		for _, h := range inner {
 			hm, _ := h.(map[string]any)
-			if cmd, _ := hm["command"].(string); cmd == SessionStartCommand {
+			if cmd, _ := hm["command"].(string); cmd == command {
 				return true
 			}
 		}

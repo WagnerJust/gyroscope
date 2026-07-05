@@ -42,6 +42,28 @@ func TestInitApplyWritesStandardPointerAndHook(t *testing.T) {
 	}
 }
 
+func TestInitApplyConfigAwareHookOmitsDisabledSpoke(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "gyroscope.json"), []byte(`{"spokes":{"local":false}}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	var out, errb bytes.Buffer
+	if err := run([]string{"init", dir, "--apply"}, &out, &errb); err != nil {
+		t.Fatalf("run: %v (%s)", err, errb.String())
+	}
+	b, err := os.ReadFile(filepath.Join(dir, ".claude", "settings.json"))
+	if err != nil {
+		t.Fatalf("read settings.json: %v", err)
+	}
+	got := string(b)
+	if strings.Contains(got, ".local/local.md") {
+		t.Fatalf("hook must not cat a disabled spoke, got: %s", got)
+	}
+	if !strings.Contains(got, "AGENTS.md") || !strings.Contains(got, "docs/agents.md") {
+		t.Fatalf("hook must cat the hub and enabled agents spoke, got: %s", got)
+	}
+}
+
 func TestInitApplyIsAllOrNothing(t *testing.T) {
 	dir := t.TempDir()
 	// Pre-existing file that collides with one of the pointers (not the first standard file),
