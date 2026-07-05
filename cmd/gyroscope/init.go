@@ -15,7 +15,7 @@ import (
 	"github.com/WagnerJust/gyroscope/internal/target"
 )
 
-func newInitCmd(stdout, stderr io.Writer) *cobra.Command {
+func newInitCmd(stdout io.Writer) *cobra.Command {
 	var apply, force bool
 	cmd := &cobra.Command{
 		Use:   "init [repo-path]",

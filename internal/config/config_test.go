@@ -3,6 +3,7 @@ package config
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -44,6 +45,9 @@ func TestLoadMalformedJSONReturnsError(t *testing.T) {
 	cfg, err := Load(dir)
 	if err == nil {
 		t.Fatal("malformed JSON should return a non-nil error")
+	}
+	if !strings.Contains(err.Error(), "gyroscope.json") {
+		t.Fatalf("malformed JSON error should name the file, got %q", err.Error())
 	}
 	if cfg != (Config{}) {
 		t.Fatalf("malformed JSON should return zero Config{}, got %+v", cfg)

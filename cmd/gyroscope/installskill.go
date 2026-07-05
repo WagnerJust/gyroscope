@@ -13,7 +13,7 @@ import (
 
 // newInstallSkillCmd installs gyroscope's own embedded skill into a skills dir
 // (default ~/.claude/skills), the way buckle installs buckle's skill.
-func newInstallSkillCmd(stdout, stderr io.Writer) *cobra.Command {
+func newInstallSkillCmd(stdout io.Writer) *cobra.Command {
 	var apply bool
 	var dir string
 	cmd := &cobra.Command{

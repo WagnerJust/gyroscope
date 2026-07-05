@@ -7,6 +7,7 @@ package config
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -40,7 +41,7 @@ func Load(dir string) (Config, error) {
 	}
 	cfg := Default()
 	if err := json.Unmarshal(b, &cfg); err != nil {
-		return Config{}, err
+		return Config{}, fmt.Errorf("parsing %s: %w", filepath.Join(dir, "gyroscope.json"), err)
 	}
 	return cfg, nil
 }

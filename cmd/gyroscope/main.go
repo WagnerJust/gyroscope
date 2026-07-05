@@ -21,7 +21,6 @@ var (
 
 const (
 	exitCannotRun = 2
-	exitInternal  = 4
 )
 
 type exitError struct {
@@ -40,7 +39,9 @@ func main() {
 		if errors.As(err, &ee) {
 			os.Exit(ee.code)
 		}
-		os.Exit(exitInternal)
+		// run() wraps every non-exitError into errCannotRun, so this is
+		// unreachable; kept as a minimal defensive fallback.
+		os.Exit(1)
 	}
 }
 
@@ -54,9 +55,9 @@ func run(args []string, stdout, stderr io.Writer) error {
 	root.SetOut(stdout)
 	root.SetErr(stderr)
 	root.Version = fmt.Sprintf("%s (commit %s, built %s)", version, commit, date)
-	root.AddCommand(newInitCmd(stdout, stderr))
+	root.AddCommand(newInitCmd(stdout))
 	root.AddCommand(newVersionCmd(stdout))
-	root.AddCommand(newInstallSkillCmd(stdout, stderr))
+	root.AddCommand(newInstallSkillCmd(stdout))
 	root.SetArgs(args)
 	if err := root.Execute(); err != nil {
 		// Cobra usage errors (bad flags/args, unknown command) come back unwrapped;
