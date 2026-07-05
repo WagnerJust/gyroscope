@@ -20,7 +20,7 @@
   - [x] Standard adds `docs/agents/`; `CONTEXT.md` seeded from interview
   - [x] Interview: the question set — 5 questions live in `skill/SKILL.md`
   - [x] The standard: concrete default spokes + templates → `templates/`
-  - [~] Customization: DROP spokes via `gyroscope.json` ✓; ADD custom spokes = in progress
+  - [x] Customization: DROP spokes via `gyroscope.json` ✓; ADD custom spokes via `custom` array — commit `60a6d86` (binary writes stub + injects route into the hub at a `<!-- gyroscope:custom-routes -->` marker)
   - [x] Distribution: `go install` + goreleaser (T9)
   - [x] Tool targets — MVP ships Claude + Gemini pointers; more deferred (see Later)
 - [x] Draft the standard's templates + interview script → `.local/drafts/`
@@ -50,7 +50,7 @@
 - [x] (4a931ce) #3 Duplicated clobber-guard write logic — `standard.Write` and `target.WritePointer` reimplement the same `MkdirAll`→`O_EXCL`/`O_TRUNC`→refuse-overwrite. Extract a shared `writeGuarded(dest, content, force)`.
 - [x] (b40ed48) #6 Empty `gyroscope.json` → opaque `unexpected end of JSON input`; wrap the unmarshal error with the filename (`config.go:42`).
 - [x] (df52737) #9 README omits `gyroscope.json` spoke toggles and `--force`; document them.
-- [~] #7 `install-skill` overwrites unconditionally — WON'T FIX (by design: `install-skill --apply` should update the gyroscope-managed skill to the latest; overwrite is correct there). `--dir` vs positional path drift left as-is.
+- [x] #7 `install-skill`: path-convention drift fixed — now takes a positional `[skills-dir]` matching `init` (commit `e199f0d`). Overwrite-on-apply kept by design (updating the managed skill should overwrite).
 - [x] (b40ed48) #5 `exitInternal` (exit 4) is now unreachable (all errors route to exit 2 via `errCannotRun`) — route genuine internal failures to it or drop it.
 - [x] (4f9cd19) #8 Pointer line says "routing **table**" but the hub uses a `## Routes` bulleted list — reword one.
 - [x] (df52737) #10 goreleaser custom `ldflags` drop the default `-s -w` → release binaries aren't stripped (larger, not wrong).
