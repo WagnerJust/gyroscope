@@ -23,3 +23,16 @@ func TestADRTemplateHasNoFillOncePlaceholders(t *testing.T) {
 			"not fill-once `{{...}}` scaffold placeholders", path)
 	}
 }
+
+// TestDotfileTemplatesAreEmbedded locks the `all:` embed prefix. A bare
+// `//go:embed templates` silently drops files whose names begin with '.'
+// (`.gitmessage`, `.github/…`), so `gyroscope init` would write nothing for
+// them. If the prefix ever regresses to a plain `//go:embed templates`, these
+// reads fail.
+func TestDotfileTemplatesAreEmbedded(t *testing.T) {
+	for _, p := range []string{"templates/.gitmessage", "templates/.github/pull_request_template.md"} {
+		if _, err := fs.ReadFile(Templates, p); err != nil {
+			t.Errorf("dotfile template %s must be embedded (needs `//go:embed all:templates`): %v", p, err)
+		}
+	}
+}

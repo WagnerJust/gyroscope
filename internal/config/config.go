@@ -33,11 +33,19 @@ type SpokeSet struct {
 	ADR      bool `json:"adr"`
 	Personas bool `json:"personas"`
 	Local    bool `json:"local"`
+	// Process artifacts encode commit/PR judgement. Applied by tooling (Git's
+	// commit template, GitHub's PR form), not read via the hub — they carry no
+	// route.
+	PRTemplate       bool `json:"prTemplate"`
+	CommitConvention bool `json:"commitConvention"`
 }
 
 // Default is the opinionated standard: every spoke on.
 func Default() Config {
-	return Config{Spokes: SpokeSet{Context: true, Agents: true, ADR: true, Personas: true, Local: true}}
+	return Config{Spokes: SpokeSet{
+		Context: true, Agents: true, ADR: true, Personas: true, Local: true,
+		PRTemplate: true, CommitConvention: true,
+	}}
 }
 
 // Load reads gyroscope.json from dir; a missing file yields Default().

@@ -4,7 +4,11 @@ package gyroscope
 
 import "embed"
 
-//go:embed templates
+// The all: prefix keeps dotfile templates (`.gitmessage`, `.github/…`) in the
+// embedded tree — a bare `//go:embed templates` silently drops names starting
+// with '.' or '_'.
+//
+//go:embed all:templates
 var Templates embed.FS
 
 //go:embed skill/SKILL.md

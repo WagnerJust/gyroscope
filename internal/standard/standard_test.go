@@ -52,6 +52,38 @@ func TestPlanDropsDisabledSpoke(t *testing.T) {
 	}
 }
 
+func TestPlanIncludesL2ProcessArtifacts(t *testing.T) {
+	files, err := Plan(config.Default())
+	if err != nil {
+		t.Fatal(err)
+	}
+	content := map[string][]byte{}
+	for _, f := range files {
+		content[f.Dest] = f.Content
+	}
+	for _, want := range []string{".github/pull_request_template.md", ".gitmessage"} {
+		if _, ok := content[want]; !ok {
+			t.Errorf("default plan should include %s", want)
+		}
+	}
+	// plumbline's l2.pr-template scores Found only with ≥3 markdown checkboxes.
+	if n := strings.Count(string(content[".github/pull_request_template.md"]), "- [ ]"); n < 3 {
+		t.Errorf("PR template needs ≥3 `- [ ]` checkboxes for plumbline Found, got %d", n)
+	}
+}
+
+func TestPlanDropsDisabledProcessArtifacts(t *testing.T) {
+	cfg := config.Default()
+	cfg.Spokes.PRTemplate = false
+	cfg.Spokes.CommitConvention = false
+	files, _ := Plan(cfg)
+	for _, f := range files {
+		if f.Dest == ".github/pull_request_template.md" || f.Dest == ".gitmessage" {
+			t.Fatalf("disabled process artifact should be dropped: %s", f.Dest)
+		}
+	}
+}
+
 func agentsContent(t *testing.T, files []File) string {
 	t.Helper()
 	for _, f := range files {

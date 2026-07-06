@@ -1,0 +1,9 @@
+# <type>: <imperative summary, <=72 chars>
+#
+# Body (wrap at 72): explain WHY the change is needed and its user-visible
+# effect. Skip the "what" when the diff is self-explanatory.
+#
+# type: feat | fix | docs | refactor | test | chore | perf | ci
+#
+# This template is opt-in per clone — enable it once with:
+#   git config commit.template .gitmessage
