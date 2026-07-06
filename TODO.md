@@ -44,7 +44,7 @@
 
 ## Post-build review follow-ups (from final holistic review — all non-blocking; MVP shippable)
 > None block shipping. Top of list = highest value. #1/#2/#4 involve a design call (yours).
-- [x] (4f9cd19) **#1 Dangling hub routes when a spoke is disabled** — `templates/AGENTS.md` is static and always lists all 5 routes, but disabling a spoke (e.g. `{"spokes":{"agents":false}}`) skips writing `docs/agents.md`, leaving a dead link. Options: conditionally template the routes, hedge every route with "may not exist" (only `.local/` does today), or have the skill prune the hub. **Design call.**
+- [x] (4f9cd19 → **superseded** 495d642) **#1 Dangling hub routes when a spoke is disabled** — first shipped as an honest hedge ("spokes are optional"). Now properly fixed: the binary renders the hub's routes from config, so disabled spokes are simply absent — no dead links, hedge removed. See ADR 0003.
 - [x] (4f9cd19) **#2 `GEMINI` target registered but never written; `target.All()` is dead API** — `init` hard-codes `target.ByID("claude")` and never loops `All()`. Either loop `All()` to write every pointer (+ add `GEMINI.md` to the hub's pointer list) or drop the gemini entry + `All()` for MVP. **Design call: does gyroscope write GEMINI.md?**
 - [x] (eb36719) **#4 Partial write leaves a hub with no enforcement; no clean recovery** — `init` returns on the first clobber before writing the pointer/hook; a repo with a pre-existing `AGENTS.md` gets nothing, and `--force` then clobbers curated content. Fix: pre-flight all destinations, fail before the first write → all-or-nothing `init`.
 - [x] (4a931ce) #3 Duplicated clobber-guard write logic — `standard.Write` and `target.WritePointer` reimplement the same `MkdirAll`→`O_EXCL`/`O_TRUNC`→refuse-overwrite. Extract a shared `writeGuarded(dest, content, force)`.
@@ -67,7 +67,9 @@
 > Addressing the problem doc: agents don't follow docs (#1), setup/resumption is heavy (#2), output is wordy (#3).
 - [x] L2 process artifacts — `.github/pull_request_template.md`, `.gitmessage`, `CONTRIBUTING.md` (commits `ec0330f`+`92a0858`); satisfies Issue #1 ("program docs into the tools") + plumbline L2.
 - [x] **State file mandate (Issue #2 — resuming a new chat on existing work)** — the standard now writes a tracked, repo-wide `TODO.md` and a gitignored, personal `.local/todo.md`, both injected by the SessionStart hook so a fresh session resumes from current progress instead of re-deriving it. New `state` spoke (default on) in `internal/config`; `hookPathsFor` cats both; hub routes to `TODO.md`.
-- [ ] Issue #3 (wordy output → rubber-stamping) — not gyroscope's layer; evaluate `caveman` (output-side). Exploration done: **recommend caveman from the skill** (lightest, zero-dependency); a gyroscope-native "terse" spoke is the fallback if terseness should join the standard. Do NOT bundle caveman's Node installer (breaks `go install`-clean).
+- [~] Issue #3 (wordy output → rubber-stamping) — not gyroscope's layer; evaluate `caveman` (output-side). Exploration done: **recommend caveman from the skill** — done (`d89dd88`, opt-in step 6). A gyroscope-native "terse" spoke remains the fallback if terseness should join the standard. Do NOT bundle caveman's Node installer (breaks `go install`-clean).
+- [x] Config-aware hub — the binary prunes routes for disabled spokes so the hub never dead-links (`495d642`, ADR 0003), superseding review #1's hedge.
+- [x] Resume the ADR habit — ADR 0003 (config-aware hub) + ADR 0004 (standard scope: encoded judgement beyond docs) written after a gap since 0002. Keep writing them per the TEMPLATE bar.
 
 ## Later — deferred (explicitly out of MVP)
 - [ ] plumbline audit-fit (coordinate; another dev owns the bridge)
