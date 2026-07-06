@@ -48,9 +48,10 @@ func newInitCmd(stdout io.Writer) *cobra.Command {
 				for _, t := range target.All() {
 					fmt.Fprintf(stdout, "  write: %s (pointer)\n", t.Path)
 				}
-				// Write() appends .local/ to .gitignore only when a local-spoke
-				// file is written; surface that mutation honestly.
-				if cfg.Spokes.Local {
+				// Write() appends .local/ to .gitignore whenever any planned file
+				// lands under .local/ (the local-notes or local-todo spoke);
+				// surface that mutation honestly by reading the plan, not one spoke.
+				if plansLocalWrite(files) {
 					fmt.Fprintf(stdout, "  update: .gitignore (ensure .local/ is listed)\n")
 				}
 				fmt.Fprintf(stdout, "  merge: .claude/settings.json — SessionStart hook: %s\n", hookCmd)
@@ -96,17 +97,33 @@ func newInitCmd(stdout io.Writer) *cobra.Command {
 }
 
 // hookPathsFor returns the repo-relative files the SessionStart hook should cat:
-// always the hub, plus the agents-instructions and local-notes spokes when they
-// are enabled. The context/adr/personas spokes are not catted by the hook.
+// always the hub, plus the agents-instructions spoke, the state files (so a
+// fresh session resumes from current progress), and the local-notes spoke, when
+// each is enabled. The context/adr/personas/contributing spokes are not catted
+// by the hook — they are read on demand via the hub's routes.
 func hookPathsFor(cfg config.Config) []string {
 	paths := []string{"AGENTS.md"}
 	if cfg.Spokes.Agents {
 		paths = append(paths, "docs/agents.md")
 	}
+	if cfg.Spokes.State {
+		paths = append(paths, "TODO.md", ".local/todo.md")
+	}
 	if cfg.Spokes.Local {
 		paths = append(paths, ".local/local.md")
 	}
 	return paths
+}
+
+// plansLocalWrite reports whether any planned file lands under .local/, which is
+// what triggers standard.Write to append .local/ to .gitignore.
+func plansLocalWrite(files []standard.File) bool {
+	for _, f := range files {
+		if strings.HasPrefix(f.Dest, ".local/") {
+			return true
+		}
+	}
+	return false
 }
 
 // existingCollisions returns the repo-relative destinations that init would

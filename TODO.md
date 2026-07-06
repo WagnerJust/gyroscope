@@ -63,6 +63,12 @@
 - [x] (7d2a9d7) Config-aware enforcement (hook) — `SessionStartCommand` is now a builder; `init` cats only the enabled spokes (`AGENTS.md` + `docs/agents.md` if agents-on + `.local/local.md` if local-on). The static hub still lists all routes, covered by the blanket "spokes are optional" hedge (review #1); per-route pruning would need the skill (binary doesn't template) — left as the hub's honest-hedge approach.
 - [x] (752cf5e) `version` double-prints when untagged (`<sha> (commit <sha>, …)`) — `versionString` now collapses to `<sha> (built …)` when version == commit; used by both `version` and `--version`.
 
+## Post-MVP — standard growth (Issue-driven, from "issues w/ agentic coding")
+> Addressing the problem doc: agents don't follow docs (#1), setup/resumption is heavy (#2), output is wordy (#3).
+- [x] L2 process artifacts — `.github/pull_request_template.md`, `.gitmessage`, `CONTRIBUTING.md` (commits `ec0330f`+`92a0858`); satisfies Issue #1 ("program docs into the tools") + plumbline L2.
+- [x] **State file mandate (Issue #2 — resuming a new chat on existing work)** — the standard now writes a tracked, repo-wide `TODO.md` and a gitignored, personal `.local/todo.md`, both injected by the SessionStart hook so a fresh session resumes from current progress instead of re-deriving it. New `state` spoke (default on) in `internal/config`; `hookPathsFor` cats both; hub routes to `TODO.md`.
+- [ ] Issue #3 (wordy output → rubber-stamping) — not gyroscope's layer; evaluate `caveman` (output-side). Exploration done: **recommend caveman from the skill** (lightest, zero-dependency); a gyroscope-native "terse" spoke is the fallback if terseness should join the standard. Do NOT bundle caveman's Node installer (breaks `go install`-clean).
+
 ## Later — deferred (explicitly out of MVP)
 - [ ] plumbline audit-fit (coordinate; another dev owns the bridge)
   - Two plumbline-side quirks surfaced during the ACMM reconciliation (fix in plumbline, not gyroscope): (1) `GEMINI.md` is not in plumbline's recognized agent-instruction paths, so a Gemini-only hub consumer is invisible to the L2 scan; (2) plumbline's `nextGap` filters on `score < Found` and ignores `NA`, so it can list our `l2.instructions-no-drift` (NA by design) as a "gap to fix."

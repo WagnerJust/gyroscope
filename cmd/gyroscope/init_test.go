@@ -31,9 +31,11 @@ func TestInitDryRunWritesNothing(t *testing.T) {
 	}
 }
 
-func TestInitDryRunOmitsGitignoreWhenLocalDisabled(t *testing.T) {
+func TestInitDryRunOmitsGitignoreWhenNoLocalWrites(t *testing.T) {
 	dir := t.TempDir()
-	if err := os.WriteFile(filepath.Join(dir, "gyroscope.json"), []byte(`{"spokes":{"local":false}}`), 0o644); err != nil {
+	// Both .local/-writing spokes off (local notes + local todo) → nothing lands
+	// under .local/, so the dry-run must not advertise a .gitignore mutation.
+	if err := os.WriteFile(filepath.Join(dir, "gyroscope.json"), []byte(`{"spokes":{"local":false,"state":false}}`), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	var out, errb bytes.Buffer
@@ -42,10 +44,10 @@ func TestInitDryRunOmitsGitignoreWhenLocalDisabled(t *testing.T) {
 	}
 	s := out.String()
 	if strings.Contains(s, ".gitignore") {
-		t.Fatalf("dry-run must not note .gitignore when local spoke is off, got: %s", s)
+		t.Fatalf("dry-run must not note .gitignore when nothing writes under .local/, got: %s", s)
 	}
-	if strings.Contains(s, ".local/local.md") {
-		t.Fatalf("dry-run hook must not include a disabled spoke, got: %s", s)
+	if strings.Contains(s, ".local/local.md") || strings.Contains(s, ".local/todo.md") {
+		t.Fatalf("dry-run hook must not include a disabled .local/ spoke, got: %s", s)
 	}
 	// Still writes nothing.
 	if _, err := os.Stat(filepath.Join(dir, "AGENTS.md")); !os.IsNotExist(err) {
@@ -120,6 +122,27 @@ func TestInitApplyConfigAwareHookOmitsDisabledSpoke(t *testing.T) {
 	}
 	if !strings.Contains(got, "AGENTS.md") || !strings.Contains(got, "docs/agents.md") {
 		t.Fatalf("hook must cat the hub and enabled agents spoke, got: %s", got)
+	}
+}
+
+func TestInitInjectsStateFilesInHookAndWritesThem(t *testing.T) {
+	dir := t.TempDir()
+	var out, errb bytes.Buffer
+	if err := run([]string{"init", dir, "--apply"}, &out, &errb); err != nil {
+		t.Fatalf("run: %v (%s)", err, errb.String())
+	}
+	b, err := os.ReadFile(filepath.Join(dir, ".claude", "settings.json"))
+	if err != nil {
+		t.Fatalf("read settings.json: %v", err)
+	}
+	got := string(b)
+	if !strings.Contains(got, "TODO.md") || !strings.Contains(got, ".local/todo.md") {
+		t.Fatalf("hook should cat the state files so a fresh session resumes, got: %s", got)
+	}
+	for _, p := range []string{"TODO.md", ".local/todo.md"} {
+		if _, err := os.Stat(filepath.Join(dir, p)); err != nil {
+			t.Errorf("init should write the state file %s: %v", p, err)
+		}
 	}
 }
 

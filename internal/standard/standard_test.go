@@ -110,6 +110,37 @@ func TestPlanRoutesContributingFromHub(t *testing.T) {
 	}
 }
 
+func TestPlanIncludesStateFiles(t *testing.T) {
+	files, err := Plan(config.Default())
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := map[string]bool{}
+	for _, f := range files {
+		got[f.Dest] = true
+	}
+	for _, want := range []string{"TODO.md", ".local/todo.md"} {
+		if !got[want] {
+			t.Errorf("default plan should include the state file %s", want)
+		}
+	}
+	agents := agentsContent(t, files)
+	if !strings.Contains(agents, "TODO.md") {
+		t.Fatalf("hub should route to TODO.md, got:\n%s", agents)
+	}
+}
+
+func TestPlanDropsDisabledState(t *testing.T) {
+	cfg := config.Default()
+	cfg.Spokes.State = false
+	files, _ := Plan(cfg)
+	for _, f := range files {
+		if f.Dest == "TODO.md" || f.Dest == ".local/todo.md" {
+			t.Fatalf("disabled state spoke should be dropped: %s", f.Dest)
+		}
+	}
+}
+
 func TestPlanDropsDisabledContributing(t *testing.T) {
 	cfg := config.Default()
 	cfg.Spokes.Contributing = false

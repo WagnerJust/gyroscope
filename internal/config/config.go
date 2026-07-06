@@ -36,6 +36,11 @@ type SpokeSet struct {
 	// Contributing is a hub-routed spoke covering the contribution process; it
 	// defers to the agents spoke for conventions rather than duplicating them.
 	Contributing bool `json:"contributing"`
+	// State writes the progress files a fresh session resumes from: a tracked,
+	// repo-wide TODO.md and a gitignored, personal .local/todo.md. Both are
+	// injected by the SessionStart hook so a new chat picks up where the last
+	// one left off.
+	State bool `json:"state"`
 	// PRTemplate and CommitConvention encode commit/PR judgement but are applied
 	// by tooling (Git's commit template, GitHub's PR form), not read via the hub
 	// — they carry no route.
@@ -47,7 +52,7 @@ type SpokeSet struct {
 func Default() Config {
 	return Config{Spokes: SpokeSet{
 		Context: true, Agents: true, ADR: true, Personas: true, Local: true,
-		Contributing: true, PRTemplate: true, CommitConvention: true,
+		Contributing: true, PRTemplate: true, CommitConvention: true, State: true,
 	}}
 }
 
