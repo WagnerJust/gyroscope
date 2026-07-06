@@ -33,9 +33,12 @@ type SpokeSet struct {
 	ADR      bool `json:"adr"`
 	Personas bool `json:"personas"`
 	Local    bool `json:"local"`
-	// Process artifacts encode commit/PR judgement. Applied by tooling (Git's
-	// commit template, GitHub's PR form), not read via the hub — they carry no
-	// route.
+	// Contributing is a hub-routed spoke covering the contribution process; it
+	// defers to the agents spoke for conventions rather than duplicating them.
+	Contributing bool `json:"contributing"`
+	// PRTemplate and CommitConvention encode commit/PR judgement but are applied
+	// by tooling (Git's commit template, GitHub's PR form), not read via the hub
+	// — they carry no route.
 	PRTemplate       bool `json:"prTemplate"`
 	CommitConvention bool `json:"commitConvention"`
 }
@@ -44,7 +47,7 @@ type SpokeSet struct {
 func Default() Config {
 	return Config{Spokes: SpokeSet{
 		Context: true, Agents: true, ADR: true, Personas: true, Local: true,
-		PRTemplate: true, CommitConvention: true,
+		Contributing: true, PRTemplate: true, CommitConvention: true,
 	}}
 }
 

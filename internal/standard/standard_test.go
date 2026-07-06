@@ -72,6 +72,55 @@ func TestPlanIncludesL2ProcessArtifacts(t *testing.T) {
 	}
 }
 
+func TestPlanRoutesContributingFromHub(t *testing.T) {
+	files, err := Plan(config.Default())
+	if err != nil {
+		t.Fatal(err)
+	}
+	var body []byte
+	for _, f := range files {
+		if f.Dest == "CONTRIBUTING.md" {
+			body = f.Content
+		}
+	}
+	if body == nil {
+		t.Fatal("default plan should include CONTRIBUTING.md")
+	}
+	// plumbline's l2.contributor-guide needs a heading + ≥20 non-blank lines.
+	var nonBlank int
+	for _, ln := range strings.Split(string(body), "\n") {
+		if strings.TrimSpace(ln) != "" {
+			nonBlank++
+		}
+	}
+	if nonBlank < 20 {
+		t.Errorf("CONTRIBUTING needs ≥20 non-blank lines for plumbline Found, got %d", nonBlank)
+	}
+	if !strings.Contains(string(body), "#") {
+		t.Error("CONTRIBUTING needs a heading for plumbline Found")
+	}
+	// No-drift guarantee: CONTRIBUTING defers conventions to docs/agents.md
+	// rather than copying them.
+	if !strings.Contains(string(body), "docs/agents.md") {
+		t.Error("CONTRIBUTING should defer to docs/agents.md, not duplicate conventions")
+	}
+	agents := agentsContent(t, files)
+	if !strings.Contains(agents, "CONTRIBUTING.md") {
+		t.Fatalf("hub should route to CONTRIBUTING.md, got:\n%s", agents)
+	}
+}
+
+func TestPlanDropsDisabledContributing(t *testing.T) {
+	cfg := config.Default()
+	cfg.Spokes.Contributing = false
+	files, _ := Plan(cfg)
+	for _, f := range files {
+		if f.Dest == "CONTRIBUTING.md" {
+			t.Fatal("disabled contributing spoke should be dropped")
+		}
+	}
+}
+
 func TestPlanDropsDisabledProcessArtifacts(t *testing.T) {
 	cfg := config.Default()
 	cfg.Spokes.PRTemplate = false

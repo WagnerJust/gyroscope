@@ -34,6 +34,7 @@ func Plan(cfg config.Config) ([]File, error) {
 		{cfg.Spokes.ADR, "templates/docs/adr/TEMPLATE.md", "docs/adr/TEMPLATE.md"},
 		{cfg.Spokes.ADR, "templates/docs/adr/0001-record-architecture-decisions.md", "docs/adr/0001-record-architecture-decisions.md"},
 		{cfg.Spokes.Personas, "templates/docs/agents/README.md", "docs/agents/README.md"},
+		{cfg.Spokes.Contributing, "templates/CONTRIBUTING.md", "CONTRIBUTING.md"},
 		{cfg.Spokes.Local, "templates/local.md", ".local/local.md"},
 		// Process artifacts (enforcement genre — Git/GitHub apply them; not hub-routed).
 		{cfg.Spokes.PRTemplate, "templates/.github/pull_request_template.md", ".github/pull_request_template.md"},

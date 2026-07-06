@@ -8,9 +8,11 @@ disable-model-invocation: true
 
 Interview the user, then install gyroscope's standard: an opinionated hub-and-spoke
 doc set (`AGENTS.md` hub, `CONTEXT.md` glossary, `docs/agents.md` instructions,
-`docs/adr/`, `docs/agents/` personas) plus a `SessionStart` hook that injects the
-hub + instructions every session. The `gyroscope` binary does the writing — this
-skill gathers what it needs and hands off.
+`docs/adr/`, `docs/agents/` personas), the L2 process artifacts (`CONTRIBUTING.md`
+routed from the hub, plus `.github/pull_request_template.md` and `.gitmessage`,
+which Git/GitHub apply directly), and a `SessionStart` hook that injects the hub +
+instructions every session. The `gyroscope` binary does the writing — this skill
+gathers what it needs and hands off.
 
 <HARD-GATE>
 Do NOT write any file or run `gyroscope init` until the user approves the gathered
@@ -52,7 +54,10 @@ Placeholders: `{{...}}` are yours to fill in step 3; `<...>` form fields in
    `<!-- ... -->` comments. Do NOT invent content the interview didn't cover; drop a term
    or leave a section terse rather than padding.
    Leave `docs/adr/TEMPLATE.md` untouched — it is a blank form whose `<...>` fields are
-   filled per-ADR, not now.
+   filled per-ADR, not now. The process artifacts (`CONTRIBUTING.md`,
+   `.github/pull_request_template.md`, `.gitmessage`) are written ready-to-use with no
+   `{{...}}` to fill; `CONTRIBUTING.md` intentionally defers conventions to
+   `docs/agents.md` — don't copy them in.
 4. **Verify none remain.** `grep -rn '{{' AGENTS.md CONTEXT.md docs/` must come back empty
    (every `{{...}}` is a fill-once placeholder; `<...>` in `TEMPLATE.md` is intentional and
    is not matched). If anything remains, you skipped a spoke — go fill it.
