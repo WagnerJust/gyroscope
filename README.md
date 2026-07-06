@@ -1,10 +1,12 @@
 # gyroscope
 
 Install an opinionated, self-enforcing agent-doc standard into any repo:
-an `AGENTS.md` hub routing to spokes (`CONTEXT.md`, `docs/agents.md`, `docs/adr/`,
-`docs/agents/`, and a gitignored personal `.local/local.md`), plus a Claude
-`SessionStart` hook that injects the rules every session — so following the docs
-isn't left to chance.
+an `AGENTS.md` hub routing to spokes (`CONTEXT.md`, `docs/agents.md`,
+`CONTRIBUTING.md`, `docs/adr/`, `docs/agents/`, a repo-wide `TODO.md`, and
+gitignored personal `.local/local.md` + `.local/todo.md`), the process artifacts
+Git/GitHub enforce (`.github/pull_request_template.md`, `.gitmessage`), and a
+Claude `SessionStart` hook that injects the hub + current state every session —
+so following the docs, and resuming work, isn't left to chance.
 
 ## Install
     go install github.com/WagnerJust/gyroscope/cmd/gyroscope@latest
@@ -22,7 +24,11 @@ Every spoke is on by default. To disable one, add `gyroscope.json` at the repo r
 
     {"spokes": {"adr": false, "personas": false}}
 
-Spokes: `context` (CONTEXT.md), `agents` (docs/agents.md), `adr` (docs/adr/),
-`personas` (docs/agents/), `local` (.local/local.md). The `AGENTS.md` hub is always written.
+Spokes: `context` (CONTEXT.md), `agents` (docs/agents.md), `contributing`
+(CONTRIBUTING.md), `adr` (docs/adr/), `personas` (docs/agents/), `state`
+(TODO.md + gitignored .local/todo.md, injected by the hook), `local`
+(.local/local.md), `prTemplate` (.github/pull_request_template.md),
+`commitConvention` (.gitmessage). The `AGENTS.md` hub is always written; disabling
+a spoke also prunes its hub route.
 
 `gyroscope init --apply` refuses to overwrite existing files; pass `--force` to overwrite.

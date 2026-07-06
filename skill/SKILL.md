@@ -10,9 +10,11 @@ Interview the user, then install gyroscope's standard: an opinionated hub-and-sp
 doc set (`AGENTS.md` hub, `CONTEXT.md` glossary, `docs/agents.md` instructions,
 `docs/adr/`, `docs/agents/` personas), the L2 process artifacts (`CONTRIBUTING.md`
 routed from the hub, plus `.github/pull_request_template.md` and `.gitmessage`,
-which Git/GitHub apply directly), and a `SessionStart` hook that injects the hub +
-instructions every session. The `gyroscope` binary does the writing — this skill
-gathers what it needs and hands off.
+which Git/GitHub apply directly), the state files (`TODO.md` + gitignored
+`.local/todo.md`), and a `SessionStart` hook that injects the hub + instructions +
+current state every session, so a fresh chat resumes where the last one stopped.
+The `gyroscope` binary does the writing — this skill gathers what it needs and
+hands off.
 
 <HARD-GATE>
 Do NOT write any file or run `gyroscope init` until the user approves the gathered

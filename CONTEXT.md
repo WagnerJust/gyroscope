@@ -22,9 +22,16 @@ _Avoid:_ "index" / "README"; calling it a spoke.
 
 ### Spoke
 One of the topic docs the hub routes to — `CONTEXT.md`, `docs/agents.md`,
-`docs/adr/`, `docs/agents/`, `.local/local.md`. Each is optional and toggled in
-`gyroscope.json`; the hub itself is always written.
-_Avoid:_ pointer file (a spoke carries content; a pointer only redirects).
+`CONTRIBUTING.md`, `docs/adr/`, `docs/agents/`, `TODO.md`, `.local/local.md`. Each
+is optional and toggled in `gyroscope.json` (which also prunes its hub route when
+off); the hub itself is always written.
+_Avoid:_ pointer file (a spoke carries content; a pointer only redirects); process artifact (written but not routed).
+
+### Process artifact
+A file gyroscope writes that Git or GitHub enforces directly rather than the hub
+routing to it — `.github/pull_request_template.md` (`prTemplate`) and `.gitmessage`
+(`commitConvention`). Part of the standard, but carries no hub route.
+_Avoid:_ spoke (a spoke is hub-routed; a process artifact is applied by tooling).
 
 ### Pointer file
 A tool-specific file (`CLAUDE.md`, `GEMINI.md`) reduced to one routing line back
@@ -48,13 +55,16 @@ _Avoid:_ doc target (far more tools, pointer-only, no enforcement).
 
 ### SessionStart hook
 The Claude adapter's mechanism: a `.claude/settings.json` entry that `cat`s the
-hub + `docs/agents.md` + `.local/local.md` into context at the start of each
-session, so the rules are present without the agent choosing to open them.
+hub + `docs/agents.md` + the state files (`TODO.md`, `.local/todo.md`) +
+`.local/local.md` into context at the start of each session, so the rules and
+current progress are present without the agent choosing to open them.
 _Avoid:_ pointer file (a hook enforces; a pointer only redirects).
 
 ### Scaffold
-A template file the binary writes verbatim: structure plus double-curly-brace
-placeholders and guidance comments, with no repo-specific content yet.
+A template file the binary writes verbatim: structure, sometimes with
+double-curly-brace placeholders and guidance comments for the skill to fill. Some
+scaffolds (`CONTRIBUTING.md`, `TODO.md`, `.local/todo.md`, the process artifacts)
+ship ready-to-use with no placeholders.
 _Avoid:_ implying a templating engine — the binary copies embedded bytes, it does not render.
 
 ### Placeholder
