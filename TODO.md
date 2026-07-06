@@ -66,7 +66,7 @@
 ## Later — deferred (explicitly out of MVP)
 - [ ] plumbline audit-fit (coordinate; another dev owns the bridge)
   - Two plumbline-side quirks surfaced during the ACMM reconciliation (fix in plumbline, not gyroscope): (1) `GEMINI.md` is not in plumbline's recognized agent-instruction paths, so a Gemini-only hub consumer is invisible to the L2 scan; (2) plumbline's `nextGap` filters on `score < Found` and ignores `NA`, so it can list our `l2.instructions-no-drift` (NA by design) as a "gap to fix."
-- [ ] Token reduction (evaluate `caveman`)
+- [ ] Output-verbosity / anti-rubber-stamping (evaluate `caveman`) — caveman shrinks the agent's **output** tokens (~65%, terse "caveman-speak"), leaving **input** untouched. It does *not* reduce the SessionStart hook's cost (that's input; the hook injects ~650 words / 3 files). It's the complement to gyroscope: gyroscope shapes what the agent *reads*, caveman shapes what it *says*. Track under "how could gyroscope recommend/integrate caveman" — see the exploration writeup.
 - [ ] Agency-persona wiring (`docs/agents/`)
 - [ ] Conformance / `check` command
 - [ ] PI coding tool enforcement adapter (next harness after Claude)
