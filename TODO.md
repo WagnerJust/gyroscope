@@ -71,6 +71,14 @@
 - [x] Config-aware hub — the binary prunes routes for disabled spokes so the hub never dead-links (`495d642`, ADR 0003), superseding review #1's hedge.
 - [x] Resume the ADR habit — ADR 0003 (config-aware hub) + ADR 0004 (standard scope: encoded judgement beyond docs) written after a gap since 0002. Keep writing them per the TEMPLATE bar.
 
+## Dogfood pass 2 (2026-07-06 — after the standard grew process/state artifacts)
+> Verdict: fresh `init` produces a coherent standard; repo is structurally faithful. All drift was in prose *describing* the standard — the exact thing gyroscope prevents — now fixed.
+- [x] README under-described the standard — listed 5 spoke toggles, real `SpokeSet` has 9; intro omitted CONTRIBUTING / state / process artifacts. Fixed (docs commit).
+- [x] `CONTEXT.md` stale — Spoke list, SessionStart-hook cat-set, and Scaffold definition predated the state/process artifacts (ADR 0004 had flagged this). Fixed + added a "Process artifact" term.
+- [x] `skill/SKILL.md` omitted the state files. Fixed.
+- [x] `docs/adr/TEMPLATE.md` drifted from the shipped template. Realigned byte-for-byte.
+- [ ] (note, not fixed) `go build ./cmd/gyroscope` reports `dev (commit none, built unknown)` — no ldflags; `make build` is the versioned path. Expected, documented as the "quick local binary."
+
 ## Later — deferred (explicitly out of MVP)
 - [ ] plumbline audit-fit (coordinate; another dev owns the bridge)
   - Two plumbline-side quirks surfaced during the ACMM reconciliation (fix in plumbline, not gyroscope): (1) `GEMINI.md` is not in plumbline's recognized agent-instruction paths, so a Gemini-only hub consumer is invisible to the L2 scan; (2) plumbline's `nextGap` filters on `score < Found` and ignores `NA`, so it can list our `l2.instructions-no-drift` (NA by design) as a "gap to fix."
