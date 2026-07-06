@@ -130,6 +130,35 @@ func TestPlanIncludesStateFiles(t *testing.T) {
 	}
 }
 
+func TestHubOmitsDisabledSpokeRoutes(t *testing.T) {
+	cfg := config.Default()
+	cfg.Spokes.Context = false
+	cfg.Spokes.ADR = false
+	cfg.Spokes.Personas = false
+	files, err := Plan(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	agents := agentsContent(t, files)
+	// Disabled spokes must not be routed — following the hub never hits a file
+	// that wasn't written.
+	for _, gone := range []string{"CONTEXT.md", "docs/adr/", "docs/agents/"} {
+		if strings.Contains(agents, gone) {
+			t.Errorf("disabled spoke route %q must be pruned from the hub, got:\n%s", gone, agents)
+		}
+	}
+	// Enabled spokes stay routed.
+	for _, want := range []string{"docs/agents.md", "TODO.md", "CONTRIBUTING.md"} {
+		if !strings.Contains(agents, want) {
+			t.Errorf("enabled spoke route %q should still be present", want)
+		}
+	}
+	// The now-unnecessary "spokes are optional" hedge is gone.
+	if strings.Contains(agents, "Spokes are optional") {
+		t.Errorf("hedge should be removed now that routes are pruned, got:\n%s", agents)
+	}
+}
+
 func TestPlanDropsDisabledState(t *testing.T) {
 	cfg := config.Default()
 	cfg.Spokes.State = false
@@ -198,7 +227,7 @@ func TestPlanCustomSpokeEmitsFileAndRoute(t *testing.T) {
 	if !strings.Contains(agents, "docs/security.md") || !strings.Contains(agents, "**Security**") {
 		t.Fatalf("hub should route to the custom spoke, got:\n%s", agents)
 	}
-	if strings.Contains(agents, "gyroscope:custom-routes") {
+	if strings.Contains(agents, "gyroscope:routes") {
 		t.Fatalf("hub must not still contain the raw marker, got:\n%s", agents)
 	}
 }
@@ -209,7 +238,7 @@ func TestPlanNoCustomSpokesRemovesMarker(t *testing.T) {
 		t.Fatal(err)
 	}
 	agents := agentsContent(t, files)
-	if strings.Contains(agents, "gyroscope:custom-routes") {
+	if strings.Contains(agents, "gyroscope:routes") {
 		t.Fatalf("hub must not contain the marker when there are no custom spokes, got:\n%s", agents)
 	}
 	// Sanity: still the built-in hub with its Routes and Pointer files sections.
@@ -234,7 +263,7 @@ func TestPlanSkipsCustomSpokeMissingNameOrDest(t *testing.T) {
 		}
 	}
 	agents := agentsContent(t, files)
-	if strings.Contains(agents, "gyroscope:custom-routes") {
+	if strings.Contains(agents, "gyroscope:routes") {
 		t.Fatalf("marker should be gone even when all custom entries are skipped, got:\n%s", agents)
 	}
 }

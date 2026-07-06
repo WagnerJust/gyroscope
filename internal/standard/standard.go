@@ -52,7 +52,7 @@ func Plan(cfg config.Config) ([]File, error) {
 			return nil, fmt.Errorf("read template %s: %w", e.tmpl, err)
 		}
 		if e.dest == "AGENTS.md" {
-			b = renderCustomRoutes(b, cfg.Custom)
+			b = renderRoutes(b, cfg)
 		}
 		files = append(files, File{Dest: e.dest, Content: b})
 	}
@@ -67,23 +67,43 @@ func Plan(cfg config.Config) ([]File, error) {
 	return files, nil
 }
 
-// customRouteMarker is the single insertion point in templates/AGENTS.md where
-// per-repo custom-spoke routes are rendered. It is a comment (not a `{{...}}`
-// fill-once placeholder) so it never trips the skill's fill check or embed_test.
-const customRouteMarker = "<!-- gyroscope:custom-routes -->\n"
+// routesMarker is the single insertion point in templates/AGENTS.md where the
+// hub's route list is rendered. The binary emits a route only for enabled spokes
+// (plus any custom spokes), so the hub never points at a file that wasn't
+// written — an agent following a route never hits a missing spoke. This is a
+// contained assembly of fixed route strings gated by config, not a templating
+// engine (see ADR 0003).
+const routesMarker = "<!-- gyroscope:routes -->"
 
-// renderCustomRoutes replaces the marker line in the hub with one route bullet
-// per custom spoke (skipping entries missing a Name or Dest), or removes it
-// cleanly when there are none — a single contained replacement, no templating.
-func renderCustomRoutes(hub []byte, custom []config.CustomSpoke) []byte {
-	var b strings.Builder
-	for _, c := range custom {
+// renderRoutes replaces the routes marker in the hub with one bullet per enabled
+// built-in spoke, in canonical order, followed by one per custom spoke (skipping
+// entries missing a Name or Dest). Disabled spokes are simply absent.
+func renderRoutes(hub []byte, cfg config.Config) []byte {
+	builtins := []struct {
+		on   bool
+		line string
+	}{
+		{cfg.Spokes.Context, "- **Naming things / writing prose** → read `CONTEXT.md` first for the canonical vocabulary."},
+		{cfg.Spokes.Agents, "- **Build, test, conventions** → `docs/agents.md`."},
+		{cfg.Spokes.State, "- **Where work stands — done / in flight / next (resume here)** → `TODO.md` (repo-wide); `.local/todo.md` holds your personal, gitignored state."},
+		{cfg.Spokes.Contributing, "- **How changes get proposed & reviewed here** → `CONTRIBUTING.md`."},
+		{cfg.Spokes.Local, "- **Your** personal setup / stack (may differ from repo defaults) → `.local/local.md` (gitignored; may not exist)."},
+		{cfg.Spokes.ADR, "- **Why the code is shaped this way** → `docs/adr/` (architecture decisions)."},
+		{cfg.Spokes.Personas, "- **Specialized agent personas for this repo** → `docs/agents/`."},
+	}
+	var lines []string
+	for _, b := range builtins {
+		if b.on {
+			lines = append(lines, b.line)
+		}
+	}
+	for _, c := range cfg.Custom {
 		if c.Name == "" || c.Dest == "" {
 			continue
 		}
-		fmt.Fprintf(&b, "- **%s** → `%s`\n", c.Name, c.Dest)
+		lines = append(lines, fmt.Sprintf("- **%s** → `%s`", c.Name, c.Dest))
 	}
-	return []byte(strings.Replace(string(hub), customRouteMarker, b.String(), 1))
+	return []byte(strings.Replace(string(hub), routesMarker, strings.Join(lines, "\n"), 1))
 }
 
 func customStub(name string) []byte {

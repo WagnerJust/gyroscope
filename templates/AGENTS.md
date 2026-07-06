@@ -4,16 +4,7 @@
 
 ## Routes
 
-> Spokes are optional: if one is disabled in `gyroscope.json`, its route below points to a file that wasn't generated.
-
-- **Naming things / writing prose** → read `CONTEXT.md` first for the canonical vocabulary.
-- **Build, test, conventions** → `docs/agents.md`.
-- **Where work stands — done / in flight / next (resume here)** → `TODO.md` (repo-wide); `.local/todo.md` holds your personal, gitignored state.
-- **How changes get proposed & reviewed here** → `CONTRIBUTING.md`.
-- **Your** personal setup / stack (may differ from repo defaults) → `.local/local.md` (gitignored; may not exist).
-- **Why the code is shaped this way** → `docs/adr/` (architecture decisions).
-- **Specialized agent personas for this repo** → `docs/agents/`.
-<!-- gyroscope:custom-routes -->
+<!-- gyroscope:routes -->
 
 ## Pointer files
 

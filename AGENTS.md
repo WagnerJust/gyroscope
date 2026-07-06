@@ -4,8 +4,6 @@
 
 ## Routes
 
-> Spokes are optional: if one is disabled in `gyroscope.json`, its route below points to a file that wasn't generated.
-
 - **Naming things / writing prose** → read `CONTEXT.md` first for the canonical vocabulary.
 - **Build, test, conventions** → `docs/agents.md`.
 - **Where work stands — done / in flight / next (resume here)** → `TODO.md` (repo-wide); `.local/todo.md` holds your personal, gitignored state.
