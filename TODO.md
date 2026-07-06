@@ -24,7 +24,7 @@
   - [x] Distribution: `go install` + goreleaser (T9)
   - [x] Tool targets — MVP ships Claude + Gemini pointers; more deferred (see Later)
 - [x] Draft the standard's templates + interview script → `.local/drafts/`
-- [ ] Reconcile drafted standard with plumbline ACMM rubric (draft-now-reconcile-later)
+- [x] Reconcile drafted standard with plumbline ACMM rubric (draft-now-reconcile-later) — commits `ec0330f`+`92a0858`. Added the three L2 process artifacts (`.github/pull_request_template.md`, `.gitmessage`, `CONTRIBUTING.md`) as toggleable, default-on standard outputs; CONTRIBUTING is hub-routed and defers conventions to `docs/agents.md` (no drift), the other two are enforcement-genre (Git/GitHub apply them, no route). Verified: gyroscope now scores plumbline **L2 (Instructed) = 1.0** (was L1/0.25); all five L2 signals Found/NA. L3–L5 left to plumbline by design.
 - [x] Implementation plan written → `.local/plans/2026-07-04-gyroscope-mvp-plan.md`
 - [x] Final design sign-off → begin build (built, reviewed, dogfooded)
 
@@ -65,6 +65,7 @@
 
 ## Later — deferred (explicitly out of MVP)
 - [ ] plumbline audit-fit (coordinate; another dev owns the bridge)
+  - Two plumbline-side quirks surfaced during the ACMM reconciliation (fix in plumbline, not gyroscope): (1) `GEMINI.md` is not in plumbline's recognized agent-instruction paths, so a Gemini-only hub consumer is invisible to the L2 scan; (2) plumbline's `nextGap` filters on `score < Found` and ignores `NA`, so it can list our `l2.instructions-no-drift` (NA by design) as a "gap to fix."
 - [ ] Token reduction (evaluate `caveman`)
 - [ ] Agency-persona wiring (`docs/agents/`)
 - [ ] Conformance / `check` command
