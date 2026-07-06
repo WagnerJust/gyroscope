@@ -62,3 +62,9 @@ Placeholders: `{{...}}` are yours to fill in step 3; `<...>` form fields in
    (every `{{...}}` is a fill-once placeholder; `<...>` in `TEMPLATE.md` is intentional and
    is not matched). If anything remains, you skipped a spoke — go fill it.
 5. Confirm what landed and where.
+6. **Optional — mention the complement.** gyroscope shapes what agents *read*. If the
+   user also finds agent *replies* too verbose (the usual cause of rubber-stamping),
+   point them at `caveman` (`github.com/JuliusBrussee/caveman`) — a complementary,
+   output-side skill that makes replies terse while keeping code/commands byte-exact.
+   It coexists with gyroscope's hook (both append-merge into `SessionStart`). Suggest,
+   don't insist — it's a third-party tool, not part of the standard.
