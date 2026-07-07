@@ -70,6 +70,7 @@
 - [x] Issue #3 (wordy output → rubber-stamping) — **decided: rely on caveman for now.** gyroscope recommends it from the skill (`d89dd88`, opt-in step 6); caveman itself runs always-on via its own SessionStart hook on Claude Code (verified from `~/Src/caveman`) — no skill nesting, coexists with gyroscope's hook. A gyroscope-native "terse" spoke is deferred → see Later. Do NOT bundle caveman's Node installer (breaks `go install`-clean).
 - [x] Config-aware hub — the binary prunes routes for disabled spokes so the hub never dead-links (`495d642`, ADR 0003), superseding review #1's hedge.
 - [x] Resume the ADR habit — ADR 0003 (config-aware hub) + ADR 0004 (standard scope: encoded judgement beyond docs) written after a gap since 0002. Keep writing them per the TEMPLATE bar.
+- [x] plumbline audit-fit (coordinate with the bridge dev; plumbline owns auditing) — concrete work done: gyroscope scores **L2 = 1.0**; plumbline `main` recognizes the hub-and-spoke + pointer layout (the bridge dev's retrofit); the two recognition quirks are fixed (`1fdb070`, `488b47b`). Remainder is **standing coordination** — keep the two in sync as each evolves (new gyroscope spoke → plumbline still scores it; new plumbline L2 signal → gyroscope satisfies it) — not a discrete task.
 
 ## Dogfood pass 2 (2026-07-06 — after the standard grew process/state artifacts)
 > Verdict: fresh `init` produces a coherent standard; repo is structurally faithful. All drift was in prose *describing* the standard — the exact thing gyroscope prevents — now fixed.
@@ -80,8 +81,6 @@
 - [ ] (note, not fixed) `go build ./cmd/gyroscope` reports `dev (commit none, built unknown)` — no ldflags; `make build` is the versioned path. Expected, documented as the "quick local binary."
 
 ## Later — deferred (explicitly out of MVP)
-- [ ] plumbline audit-fit (coordinate; another dev owns the bridge)
-  - [x] Two plumbline-side quirks surfaced during the ACMM reconciliation were **fixed by the plumbline dev**: (1) `GEMINI.md` now a recognized agent-instruction path (`1fdb070`); (2) `nextGap` now excludes `NA` signals (`488b47b`). Re-verified against the updated plumbline: gyroscope still scores **L2 = 1.0**.
 - [ ] **Native "terse" spoke (option c) — build if caveman-by-recommendation proves too weak.** Using caveman for now (see Post-MVP). The skill recommendation is discovery-only + setup-only; a gyroscope-owned terse spoke `cat` by the SessionStart hook would be *always-on*, dependency-free, and use the same mechanism caveman does (hook-injected rules) — no Node, no separate install, no skill nesting. Ship a static ruleset (drop filler/hedging/pleasantries; keep code, commands, and error strings byte-exact; **never** terse-ify security warnings or irreversible-action confirmations). Tradeoff vs caveman: no tuned levels / statusline / measurement. Wire as a `terse` `SpokeSet` toggle + `templates/docs/terse.md` + a `hookPathsFor` entry — mirror the `state` spoke. Context: caveman shrinks **output** tokens (~65%), leaves **input** untouched, so it never reduced the hook cost — it's the output-side complement to gyroscope's input-side docs.
 - [ ] Agency-persona wiring (`docs/agents/`)
 - [ ] Conformance / `check` command
