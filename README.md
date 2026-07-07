@@ -17,6 +17,7 @@ so following the docs, and resuming work, isn't left to chance.
     # or non-interactively:
     gyroscope init            # dry-run: show what would be written
     gyroscope init --apply    # write the standard + pointer + hook
+    gyroscope check           # read-only: verify a repo still conforms (0=ok, 1=drift, 2=error)
 
 ## Configure (optional)
 

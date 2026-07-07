@@ -75,10 +75,25 @@ func Plan(cfg config.Config) ([]File, error) {
 // engine (see ADR 0003).
 const routesMarker = "<!-- gyroscope:routes -->"
 
-// renderRoutes replaces the routes marker in the hub with one bullet per enabled
-// built-in spoke, in canonical order, followed by one per custom spoke (skipping
-// entries missing a Name or Dest). Disabled spokes are simply absent.
+// renderRoutes replaces the routes marker in the hub with the route block for
+// cfg: one bullet per enabled built-in spoke, in canonical order, followed by one
+// per custom spoke. Disabled spokes are simply absent.
 func renderRoutes(hub []byte, cfg config.Config) []byte {
+	return []byte(strings.Replace(string(hub), routesMarker, Routes(cfg), 1))
+}
+
+// Routes returns the hub's route block for cfg — the newline-joined bullets
+// renderRoutes splices into the hub. It is the single source of truth for the
+// route strings, shared by init (via renderRoutes) and by `gyroscope check`,
+// which compares it against the on-disk hub rather than re-deriving the bullets.
+func Routes(cfg config.Config) string {
+	return strings.Join(routeLines(cfg), "\n")
+}
+
+// routeLines builds one hub route bullet per enabled built-in spoke, in canonical
+// order, followed by one per custom spoke (skipping entries missing a Name or
+// Dest).
+func routeLines(cfg config.Config) []string {
 	builtins := []struct {
 		on   bool
 		line string
@@ -103,7 +118,7 @@ func renderRoutes(hub []byte, cfg config.Config) []byte {
 		}
 		lines = append(lines, fmt.Sprintf("- **%s** → `%s`", c.Name, c.Dest))
 	}
-	return []byte(strings.Replace(string(hub), routesMarker, strings.Join(lines, "\n"), 1))
+	return lines
 }
 
 func customStub(name string) []byte {

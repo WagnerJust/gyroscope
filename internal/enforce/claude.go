@@ -89,6 +89,30 @@ func (Claude) Install(repoDir string, command string) (changed bool, err error) 
 	return true, nil
 }
 
+// HasSessionStart reports whether repoDir/.claude/settings.json already carries a
+// SessionStart hook whose command equals command. It is the read-only inverse of
+// Install: a missing settings file — or a missing/differently-shaped hooks tree —
+// reports false (not present), so a verifier can treat that as nonconformance,
+// while a genuine read or parse error is returned so "can't inspect" stays
+// distinct from "not there". Reuses present so the match logic lives in one place.
+func (Claude) HasSessionStart(repoDir string, command string) (bool, error) {
+	path := filepath.Join(repoDir, ".claude", "settings.json")
+	b, err := os.ReadFile(path)
+	if os.IsNotExist(err) {
+		return false, nil
+	}
+	if err != nil {
+		return false, err
+	}
+	var settings map[string]any
+	if err := json.Unmarshal(b, &settings); err != nil {
+		return false, err
+	}
+	hooks, _ := settings["hooks"].(map[string]any)
+	list, _ := hooks["SessionStart"].([]any)
+	return present(list, command), nil
+}
+
 func present(list []any, command string) bool {
 	for _, e := range list {
 		m, _ := e.(map[string]any)

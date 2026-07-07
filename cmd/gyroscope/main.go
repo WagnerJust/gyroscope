@@ -20,6 +20,11 @@ var (
 )
 
 const (
+	// exitDrift signals a successful check that found nonconformance — the repo
+	// no longer matches the standard. Distinct from exitCannotRun so CI can tell
+	// "drift found" (a real result) apart from "couldn't run" (a genuine error).
+	exitDrift = 1
+	// exitCannotRun signals a genuine failure: bad path, I/O, or malformed input.
 	exitCannotRun = 2
 )
 
@@ -31,6 +36,7 @@ type exitError struct {
 func (e *exitError) Error() string { return e.err.Error() }
 func (e *exitError) Unwrap() error { return e.err }
 func errCannotRun(err error) error { return &exitError{exitCannotRun, err} }
+func errDrift(err error) error     { return &exitError{exitDrift, err} }
 
 func main() {
 	if err := run(os.Args[1:], os.Stdout, os.Stderr); err != nil {
@@ -56,6 +62,7 @@ func run(args []string, stdout, stderr io.Writer) error {
 	root.SetErr(stderr)
 	root.Version = versionString(version, commit, date)
 	root.AddCommand(newInitCmd(stdout))
+	root.AddCommand(newCheckCmd(stdout))
 	root.AddCommand(newVersionCmd(stdout))
 	root.AddCommand(newInstallSkillCmd(stdout))
 	root.SetArgs(args)
