@@ -87,8 +87,10 @@ _Avoid:_ conflating it with the skill (the skill supplies content).
 
 ### The skill
 `/gyroscope`: the companion (embedded `skill/SKILL.md`, installed via
-`install-skill`) that runs the interview and fills the scaffolds' placeholders.
-User-invoked, not model-invoked.
+`install-skill`) that runs the interview, reconciles an existing repo, and fills the
+scaffolds' placeholders. Model-invocable — a plain request like "get this repo up to
+date with gyroscope" can trigger it — but gated: it never writes without showing a
+plan and getting approval (see ADR 0008).
 _Avoid:_ conflating it with the binary (the binary writes structure).
 
 ### dry-run

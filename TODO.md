@@ -151,6 +151,19 @@
   ~10% of the code — build only if blocks prove too weak). The binary stays
   non-interactive; interactivity lives in the skill.
 
+## Skill: model-invocable + existing-repo reconciliation (2026-07-08)
+> Reverses the deliberate "user-invoked" decision (line 19) — see ADR 0008.
+- [x] **Flip `/gyroscope` to model-invocable** — removed `disable-model-invocation`
+  from `skill/SKILL.md`; broadened the description so NL ("get this repo up to date
+  with gyroscope", adopt, migrate a buckle hub, or fresh setup) triggers it.
+  Strengthened the HARD-GATE (now load-bearing: auto-invocation never bypasses
+  show-plan-then-approve). Updated CONTEXT.md's "skill" term. ADR 0008.
+- [x] **Existing-repo reconciliation flow** — added a "reconcile, don't clobber"
+  section to `skill/SKILL.md`: `check` → dry-run classify → `init --apply` (no
+  force) → hand-reconcile each CONFLICT (pointer content relocation, artifact
+  keep-vs-adopt, hub route dedup) → fill from existing docs → `check --fix` to green.
+  Closes the gap the notwhoop live test exposed (SKILL.md was fresh-scaffold-only).
+
 ## Later — deferred (explicitly out of MVP)
 - [ ] **Zed enforcement adapter** — active `enforce.Adapter` for Zed (the passive `.rules` doc-target pointer already exists; this is the force-inject side, parallel to Claude's SessionStart hook / PI's `session_start` extension). Investigate Zed's injection mechanism (does its agent support a session-start hook / rule that force-reads the hub, or is `.rules` native-read only?). If native-read only, there may be nothing to enforce — document that outcome. Wire behind the `enforce` config section (`zed`, opt-in) if a mechanism exists.
 - [ ] **Cursor enforcement adapter** — active `enforce.Adapter` for Cursor (passive `.cursorrules` pointer already exists). Investigate Cursor's mechanism: `.cursor/rules/*.mdc` with `alwaysApply: true` (always-injected project rules) and/or Cursor hooks. An always-applied rule that force-reads the hub would be the enforcement analog. Wire behind the `enforce` config section (`cursor`, opt-in).

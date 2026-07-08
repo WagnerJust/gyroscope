@@ -1,24 +1,35 @@
 ---
 name: gyroscope
-description: Set up gyroscope's opinionated, self-enforcing agent-doc standard in this repo — interview, then write the standard and install the enforcement hook.
-disable-model-invocation: true
+description: Set up OR bring a repo up to date with gyroscope's opinionated, self-enforcing agent-doc standard — the `AGENTS.md` hub, its spokes, the pointer files, and the enforcement hook. Use when the user wants to adopt gyroscope, "get this repo up to date with gyroscope", make `gyroscope check` pass, migrate an existing or buckle-style hub, or scaffold agent docs from scratch. Interviews only where the repo can't answer, and always gets approval before writing.
 ---
 
 # gyroscope
 
-Interview the user, then install gyroscope's standard: an opinionated hub-and-spoke
-doc set (`AGENTS.md` hub, `CONTEXT.md` glossary, `docs/agents.md` instructions,
-`docs/adr/`, `docs/agents/` personas), the L2 process artifacts (`CONTRIBUTING.md`
-routed from the hub, plus `.github/pull_request_template.md` and `.gitmessage`,
-which Git/GitHub apply directly), the state files (`TODO.md` + gitignored
-`.local/todo.md`), and a `SessionStart` hook that injects the hub + instructions +
-current state every session, so a fresh chat resumes where the last one stopped.
-The `gyroscope` binary does the writing — this skill gathers what it needs and
-hands off.
+Set up gyroscope's standard, or bring an existing repo up to date with it: an
+opinionated hub-and-spoke doc set (`AGENTS.md` hub, `CONTEXT.md` glossary,
+`docs/agents.md` instructions, `docs/adr/`, `docs/agents/` personas), the L2 process
+artifacts (`CONTRIBUTING.md` routed from the hub, plus `.github/pull_request_template.md`
+and `.gitmessage`, which Git/GitHub apply directly), the state files (`TODO.md` +
+gitignored `.local/todo.md`), and a `SessionStart` hook that injects the hub +
+instructions + current state every session, so a fresh chat resumes where the last
+one stopped. The `gyroscope` binary does the writing — this skill gathers what it
+needs, reconciles what already exists, and hands off.
+
+**Two entry points, same flow:**
+- **Fresh setup** — no `AGENTS.md` yet: interview, then write the standard.
+- **Adopt / update** — a repo that already has agent docs (or a buckle-style hub):
+  read the current state with `gyroscope check`, then converge it (see "Existing
+  repo — reconcile, don't clobber"). This is the path for "get this repo up to date
+  with gyroscope".
 
 <HARD-GATE>
-Do NOT write any file or run `gyroscope init` until the user approves the gathered
-answers. Present them first, even if the request seems fully specified.
+This skill is model-invocable, so it may fire from a plain request like "get this
+repo up to date with gyroscope" — that convenience does NOT relax the gate. Do NOT
+write any file, run `gyroscope init --apply`, or `--force` anything until you have
+shown the plan (the classified file list + any conflicts + the answers you gathered)
+and the user has approved it. Present first, even if the request seems fully
+specified. `gyroscope check` and dry-run `gyroscope init` are read-only and may be
+run before approval to build that plan.
 </HARD-GATE>
 
 ## Explore first, then ask
@@ -75,6 +86,47 @@ Placeholders: `{{...}}` are yours to fill in step 3; `<...>` form fields in
    output-side skill that makes replies terse while keeping code/commands byte-exact.
    It coexists with gyroscope's hook (both append-merge into `SessionStart`). Suggest,
    don't insist — it's a third-party tool, not part of the standard.
+
+## Existing repo — reconcile, don't clobber
+
+When the repo already has agent docs (an `AGENTS.md`, a `CLAUDE.md` with real
+content, a buckle-style hub, `CONTRIBUTING.md`, etc.), do NOT run the fresh-setup
+path blind and do NOT reach for `--force` — it overwrites content-bearing files.
+Converge instead:
+
+1. **See the current state (read-only).** `gyroscope check .` lists every drift;
+   `gyroscope init .` (dry-run) classifies each destination **NEW** (create),
+   **OK** (already conformant), **MERGE** (present, gyroscope injects its managed
+   region and leaves the rest), or **CONFLICT** (present, differs — needs a
+   decision). Build the plan from this.
+2. **Present the plan, get approval** (the HARD-GATE). Show the classified list,
+   name the CONFLICTs, and say what you intend to do with each.
+3. **Apply the safe subset:** `gyroscope init --apply .` — **no `--force`**. This
+   creates the NEW files, injects the hub's managed region into an existing
+   `AGENTS.md` without touching the user's other content, and **skips** every
+   CONFLICT (it prints them and exits with drift). Nothing is destroyed.
+4. **Reconcile each CONFLICT by hand, one at a time** — never a blanket `--force`:
+   - **A content-bearing pointer** (e.g. a `CLAUDE.md` that holds real instructions):
+     gyroscope wants it reduced to the one routing line. Relocate its content into
+     the hub or the matching spoke first, then replace the file with the canonical
+     routing line.
+   - **`CONTRIBUTING.md` / `.gitmessage` / `.github/pull_request_template.md` /
+     `docs/agents/README.md`:** compare the repo's version against gyroscope's. If
+     the repo's already satisfies the artifact, keep it (it's fine that it differs);
+     adopt gyroscope's only if the user prefers it, and only then `--force` that one
+     file.
+   - **Hub routes:** after the merge the hub may carry both the repo's own routes and
+     gyroscope's managed `## Routes` block. Fold the custom routes into the managed
+     block, or leave them under a separate heading OUTSIDE the
+     `<!-- gyroscope:managed -->` markers — content outside the markers is the user's
+     and is invisible to `check`. Remove the duplication either way.
+5. **Fill placeholders from what already exists.** On an established repo, prefer the
+   repo's own docs/READMEs over interviewing from scratch — pull the one-liner,
+   domain terms, and build/test commands from what's there, and only ask the user
+   for what the repo can't answer.
+6. **Converge to green:** `gyroscope check --fix .` re-applies the safe convergence
+   (never clobbers a CONFLICT) and re-checks; loop with hand-reconciliation until
+   `gyroscope check .` reports `conformant` (exit 0).
 
 ## Agent personas (docs/agents/)
 
