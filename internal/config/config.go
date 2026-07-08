@@ -14,10 +14,20 @@ import (
 )
 
 type Config struct {
-	Spokes SpokeSet `json:"spokes"`
+	Spokes  SpokeSet   `json:"spokes"`
+	Enforce EnforceSet `json:"enforce"`
 	// Custom lists extra spoke doc files beyond the built-in five. Absent means
 	// none; the writer skips any entry missing a Name or Dest.
 	Custom []CustomSpoke `json:"custom"`
+}
+
+// EnforceSet toggles which harness enforcement adapters init installs and check
+// verifies. Claude is default-on (unchanged behavior); PI is opt-in because its
+// extension is more intrusive and only useful in repos actually driven by PI
+// (see ADR 0002 — enforcement is opt-in per harness).
+type EnforceSet struct {
+	Claude bool `json:"claude"`
+	PI     bool `json:"pi"`
 }
 
 // CustomSpoke is a user-defined spoke: a doc file gyroscope scaffolds and routes
@@ -99,10 +109,13 @@ type SpokeSet struct {
 
 // Default is the opinionated standard: every spoke on.
 func Default() Config {
-	return Config{Spokes: SpokeSet{
-		Context: true, Agents: true, ADR: true, Personas: PersonaUnknown, Local: true,
-		Contributing: true, PRTemplate: true, CommitConvention: true, State: true,
-	}}
+	return Config{
+		Spokes: SpokeSet{
+			Context: true, Agents: true, ADR: true, Personas: PersonaUnknown, Local: true,
+			Contributing: true, PRTemplate: true, CommitConvention: true, State: true,
+		},
+		Enforce: EnforceSet{Claude: true, PI: false},
+	}
 }
 
 // Load reads gyroscope.json from dir; a missing file yields Default().

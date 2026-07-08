@@ -89,6 +89,40 @@ func TestLoadMalformedJSONReturnsError(t *testing.T) {
 	}
 }
 
+func TestDefaultEnforceClaudeOnPIOff(t *testing.T) {
+	e := Default().Enforce
+	if !e.Claude || e.PI {
+		t.Fatalf("default enforce should be claude-on/pi-off, got %+v", e)
+	}
+}
+
+func TestEnforcePIOptInKeepsClaude(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "gyroscope.json"), []byte(`{"enforce":{"pi":true}}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	cfg, err := Load(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !cfg.Enforce.PI {
+		t.Fatal("pi should be enabled")
+	}
+	if !cfg.Enforce.Claude {
+		t.Fatal("claude should stay on when only pi is named")
+	}
+}
+
+func TestEnforceAbsentKeepsDefaults(t *testing.T) {
+	cfg, err := Load(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.Enforce != (EnforceSet{Claude: true, PI: false}) {
+		t.Fatalf("absent enforce should be default, got %+v", cfg.Enforce)
+	}
+}
+
 func TestPersonasBoolBackCompat(t *testing.T) {
 	cases := map[string]PersonaState{
 		`{"spokes":{"personas":true}}`:  PersonaUnknown,
