@@ -23,6 +23,21 @@ type Claude struct{}
 
 func (Claude) ID() string { return "claude" }
 
+// PlanLine, Apply, and Verify adapt Claude to the Adapter interface: they build
+// the hook command from paths and delegate to the existing merge/inspect logic.
+
+func (Claude) PlanLine(paths []string) string {
+	return "merge: .claude/settings.json — SessionStart hook: " + SessionStartCommand(paths...)
+}
+
+func (c Claude) Apply(repoDir string, paths []string) (bool, error) {
+	return c.Install(repoDir, SessionStartCommand(paths...))
+}
+
+func (c Claude) Verify(repoDir string, paths []string) (bool, error) {
+	return c.HasSessionStart(repoDir, SessionStartCommand(paths...))
+}
+
 // Install merges gyroscope's SessionStart hook into repoDir/.claude/settings.json.
 // Returns changed=false when the hook is already present.
 func (Claude) Install(repoDir string, command string) (changed bool, err error) {

@@ -8,6 +8,45 @@ import (
 	"testing"
 )
 
+func TestClaudeSatisfiesAdapter(t *testing.T) {
+	var _ Adapter = Claude{}
+}
+
+func TestClaudeApplyThenVerify(t *testing.T) {
+	dir := t.TempDir()
+	c := Claude{}
+	paths := []string{"AGENTS.md", "docs/agents.md"}
+
+	changed, err := c.Apply(dir, paths)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !changed {
+		t.Fatal("first Apply should install the hook")
+	}
+	ok, err := c.Verify(dir, paths)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !ok {
+		t.Fatal("Verify should see the hook Apply just installed")
+	}
+	changed, err = c.Apply(dir, paths)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if changed {
+		t.Fatal("second Apply should be idempotent")
+	}
+}
+
+func TestClaudePlanLineNamesTheHook(t *testing.T) {
+	line := (Claude{}).PlanLine([]string{"AGENTS.md", "docs/agents.md"})
+	if !strings.Contains(line, ".claude/settings.json") || !strings.Contains(line, "cat AGENTS.md") {
+		t.Fatalf("plan line should describe the hook, got %q", line)
+	}
+}
+
 func TestSessionStartCommand(t *testing.T) {
 	if got := SessionStartCommand("AGENTS.md", "docs/agents.md"); got != "cat AGENTS.md docs/agents.md 2>/dev/null" {
 		t.Fatalf("unexpected command: %q", got)
