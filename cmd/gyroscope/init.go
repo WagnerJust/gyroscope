@@ -100,7 +100,9 @@ func newInitCmd(stdout io.Writer) *cobra.Command {
 // always the hub, plus the agents-instructions spoke, the state files (so a
 // fresh session resumes from current progress), and the local-notes spoke, when
 // each is enabled. The context/adr/personas/contributing spokes are not catted
-// by the hook — they are read on demand via the hub's routes.
+// by the hook — they are read on demand via the hub's routes. gyroscope.json is
+// catted when personas are enabled, so the live personas state is in session
+// context for the hub's personas directive.
 func hookPathsFor(cfg config.Config) []string {
 	paths := []string{"AGENTS.md"}
 	if cfg.Spokes.Agents {
@@ -111,6 +113,11 @@ func hookPathsFor(cfg config.Config) []string {
 	}
 	if cfg.Spokes.Local {
 		paths = append(paths, ".local/local.md")
+	}
+	if cfg.Spokes.Personas.Enabled() {
+		// The hub's personas directive branches on spokes.personas; cat the config
+		// so the live state is in session context (the hook stays pure `cat`).
+		paths = append(paths, "gyroscope.json")
 	}
 	return paths
 }

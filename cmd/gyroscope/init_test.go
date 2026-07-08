@@ -6,6 +6,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/WagnerJust/gyroscope/internal/config"
 )
 
 func TestInitDryRunWritesNothing(t *testing.T) {
@@ -180,4 +182,27 @@ func TestInitApplyRefusesOverwriteWithoutForce(t *testing.T) {
 	if err := run([]string{"init", dir, "--apply"}, &out, &errb); err == nil {
 		t.Fatal("second apply without --force should refuse to overwrite")
 	}
+}
+
+func TestHookPathsCatGyroscopeJSONWhenPersonasEnabled(t *testing.T) {
+	cfg := config.Default() // personas unknown → enabled
+	got := hookPathsFor(cfg)
+	if !contains(got, "gyroscope.json") {
+		t.Fatalf("hook should cat gyroscope.json when personas enabled: %v", got)
+	}
+
+	cfg.Spokes.Personas = config.PersonaOff
+	got = hookPathsFor(cfg)
+	if contains(got, "gyroscope.json") {
+		t.Fatalf("hook should not cat gyroscope.json when personas off: %v", got)
+	}
+}
+
+func contains(ss []string, want string) bool {
+	for _, s := range ss {
+		if s == want {
+			return true
+		}
+	}
+	return false
 }
