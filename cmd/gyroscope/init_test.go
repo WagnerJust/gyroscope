@@ -240,6 +240,43 @@ func TestInitApplyMergesManagedRegionIntoExistingHub(t *testing.T) {
 	}
 }
 
+// Regression (defect 1, apply half): a markerless hand-written hub is merged in
+// place on --apply (no --force) — the managed region is injected AND every byte
+// of the user's original hub survives. Pairs with TestClassifyMergeOnMarkerlessHub.
+func TestInitApplyMergesMarkerlessHub(t *testing.T) {
+	dir := t.TempDir()
+	// A hand-written hub with sentinel content and no gyroscope markers.
+	userHub := "# notwhoop — agent hub\n\n" +
+		"Before touching the band, read this.\n\n" +
+		"## Milestones\n\n1. openwhoop → local SQLite buffer\n"
+	if err := os.WriteFile(filepath.Join(dir, "AGENTS.md"), []byte(userHub), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	var out, errb bytes.Buffer
+	if err := run([]string{"init", dir, "--apply"}, &out, &errb); err != nil {
+		t.Fatalf("markerless hub merge should succeed without --force, got %v (%s)", err, errb.String())
+	}
+	got, err := os.ReadFile(filepath.Join(dir, "AGENTS.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	s := string(got)
+	// The managed region was injected.
+	if !strings.Contains(s, standard.ManagedOpen) || !strings.Contains(s, standard.ManagedClose) {
+		t.Fatalf("apply must inject the managed region into a markerless hub, got:\n%s", s)
+	}
+	if !strings.Contains(s, "**Build, test, conventions** → `docs/agents.md`.") {
+		t.Fatalf("apply must inject the managed routes, got:\n%s", s)
+	}
+	// Sentinels from the original hand-written hub survive — nothing clobbered.
+	if !strings.Contains(s, "Before touching the band, read this.") {
+		t.Fatalf("original hub content must survive the merge, got:\n%s", s)
+	}
+	if !strings.Contains(s, "openwhoop → local SQLite buffer") {
+		t.Fatalf("original milestone content must survive the merge, got:\n%s", s)
+	}
+}
+
 func TestInitApplyRefusesConflictWithoutForce(t *testing.T) {
 	dir := t.TempDir()
 	// A foreign pointer file with no managed region is a CONFLICT: init --apply

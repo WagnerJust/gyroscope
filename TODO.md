@@ -105,6 +105,10 @@
   `internal/standard/managed.go` region primitives (`MergeManaged`); dry-run now
   prints per-file state; hub template wrapped in `<!-- gyroscope:managed -->`.
   `existingCollisions` retired for `preexisting`/`conflicts`. Commit `99a53c3`.
+  Follow-up (migration case): a hand-written hub with NO managed markers now
+  classifies MERGE (D1's "present, missing managed content"), not CONFLICT —
+  `MergeManaged` appends the wrapped region at EOF, preserving all user prose above
+  it. Verified against a real 58-line hand-written hub (notwhoop).
 - [x] **D2 Managed-block boundary for the hub.** Generalize the existing
   `<!-- gyroscope:custom-routes -->` marker to a full managed region in `AGENTS.md`:
   gyroscope owns only content between `<!-- gyroscope:managed -->` /

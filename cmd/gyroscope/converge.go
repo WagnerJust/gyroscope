@@ -93,9 +93,10 @@ func classifyOne(abs, dest string, want []byte) convergeItem {
 		item.State = stateOK
 		return item
 	}
-	// The hub is the one file with a managed region: if the surrounding
-	// (user-owned) content differs but the managed region can be brought current
-	// in place, that is a MERGE rather than a CONFLICT.
+	// The hub is the one file with a managed region: if its managed region can be
+	// brought current in place — by swapping an existing region, or by appending a
+	// region to a hand-written hub that has none (D1's "present, missing managed
+	// content") — that is a MERGE, not a CONFLICT. MergeManaged handles both.
 	if dest == "AGENTS.md" {
 		if merged, ok := standard.MergeManaged(got, want); ok {
 			if bytes.Equal(merged, got) {

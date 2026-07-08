@@ -54,11 +54,46 @@ func TestMergeManagedReplacesOnlyTheRegion(t *testing.T) {
 }
 
 func TestMergeManagedFailsWithoutRegion(t *testing.T) {
+	// A doc with no markers is no longer un-mergeable: MergeManaged appends the
+	// managed region at EOF (see TestMergeManagedAppendsRegionToMarkerlessDoc).
+	// It still fails when the *want* carries no region to inject.
 	want := []byte(ManagedOpen + "\nbody\n" + ManagedClose)
-	if _, ok := MergeManaged([]byte("a plain file, no markers"), want); ok {
-		t.Fatal("a doc with no managed region cannot be merged")
-	}
 	if _, ok := MergeManaged([]byte(ManagedOpen+"\nx\n"+ManagedClose), []byte("want has no region")); ok {
 		t.Fatal("a want with no managed region cannot drive a merge")
+	}
+	_ = want
+}
+
+func TestMergeManagedAppendsRegionToMarkerlessDoc(t *testing.T) {
+	// A hand-written hub that predates gyroscope has no managed markers at all.
+	// That is exactly D1's MERGE case ("present, missing managed content"): the
+	// region is appended at EOF, preserving every byte of the user's content.
+	doc := []byte("# notwhoop hub\n\nBefore touching the band, read this.\n")
+	want := []byte("# AGENTS.md\n\n" + ManagedOpen + "\nfresh managed body\n" + ManagedClose + "\n")
+
+	merged, ok := MergeManaged(doc, want)
+	if !ok {
+		t.Fatal("a markerless doc should merge by appending the region")
+	}
+	s := string(merged)
+	// All original content survives.
+	if !bytes.Contains(merged, []byte("Before touching the band, read this.")) {
+		t.Fatalf("user content must be preserved:\n%s", s)
+	}
+	// The managed region is now present (appended at EOF).
+	if !bytes.Contains(merged, []byte(ManagedOpen+"\nfresh managed body\n"+ManagedClose)) {
+		t.Fatalf("managed region must be appended:\n%s", s)
+	}
+	// The region comes after the user's content, not before it.
+	if bytes.Index(merged, []byte("Before touching the band")) > bytes.Index(merged, []byte(ManagedOpen)) {
+		t.Fatalf("user content must precede the appended region:\n%s", s)
+	}
+	// The appended region round-trips: re-merging with the same want is a no-op.
+	again, ok := MergeManaged(merged, want)
+	if !ok {
+		t.Fatal("re-merge of an already-merged doc should succeed")
+	}
+	if !bytes.Equal(again, merged) {
+		t.Fatalf("re-merge must be idempotent:\n%s", again)
 	}
 }

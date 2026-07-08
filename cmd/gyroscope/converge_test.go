@@ -108,3 +108,26 @@ func TestClassifyMergeOnHubMissingManagedContent(t *testing.T) {
 		t.Fatalf("hub with a stale managed region should be MERGE, got %s", s)
 	}
 }
+
+// Regression (defect 1): a hand-written hub that predates gyroscope has NO
+// managed markers at all. D1's definition of MERGE is "present, missing managed
+// content" — that is exactly this file, so it must classify MERGE (not CONFLICT,
+// which would force a clobber of the user's hub).
+func TestClassifyMergeOnMarkerlessHub(t *testing.T) {
+	dir := t.TempDir()
+	// A 3-line hand-written hub with a sentinel and zero gyroscope markers.
+	got := "# my hub\n\nBefore touching the band, read this.\n"
+	if err := os.WriteFile(filepath.Join(dir, "AGENTS.md"), []byte(got), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	items, err := classifyAll(dir, config.Default())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if s := stateOf(t, items, "AGENTS.md"); s != stateMerge {
+		t.Fatalf("markerless hand-written hub should be MERGE, got %s", s)
+	}
+	if c := conflicts(items); len(c) != 0 {
+		t.Fatalf("a markerless hub must not be a CONFLICT, got conflicts: %v", c)
+	}
+}

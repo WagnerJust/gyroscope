@@ -42,14 +42,21 @@ func hubManaged(renderedHub []byte) ([]byte, bool) {
 	return ManagedRegion(renderedHub)
 }
 
-// MergeManaged returns doc with its managed region replaced by the managed region
-// of want (the freshly-rendered hub), leaving all content outside the markers
-// untouched. ok is false when either doc or want lacks a well-formed managed
-// region — the caller then treats the file as an un-mergeable whole (CONFLICT).
+// MergeManaged returns doc brought current with the managed region of want (the
+// freshly-rendered hub), leaving all content outside the markers untouched. It has
+// two paths, both of which preserve the user's prose byte-for-byte and perform no
+// 3-way content merge (see ADR 0007):
 //
-// This is the in-place merge path: it re-writes only the bytes gyroscope owns and
-// preserves the user's surrounding prose byte-for-byte. It performs no 3-way
-// content merge — it swaps one managed region for another (see ADR 0007).
+//   - doc already has a well-formed managed region → its region is swapped for
+//     want's, in place.
+//   - doc has NO managed markers (a hand-written hub that predates gyroscope, or
+//     one whose markers were never present) → want's full managed region, wrapped
+//     in the markers, is APPENDED at EOF. This is D1's MERGE case ("present,
+//     missing managed content"): the whole file is the user's, so the safest home
+//     for gyroscope's region is after it, disturbing nothing above.
+//
+// ok is false only when want itself lacks a well-formed managed region (nothing to
+// inject).
 func MergeManaged(doc, want []byte) (merged []byte, ok bool) {
 	wantRegion, ok := hubManaged(want)
 	if !ok {
@@ -58,11 +65,29 @@ func MergeManaged(doc, want []byte) (merged []byte, ok bool) {
 	s := string(doc)
 	i := strings.Index(s, ManagedOpen)
 	if i < 0 {
-		return nil, false
+		// No managed markers anywhere: append the wrapped region at EOF, keeping
+		// every byte of the user's hub above it. Ensure one blank line of
+		// separation so the appended block reads as its own section.
+		var buf bytes.Buffer
+		buf.WriteString(s)
+		if len(s) > 0 && !strings.HasSuffix(s, "\n") {
+			buf.WriteByte('\n')
+		}
+		if !strings.HasSuffix(buf.String(), "\n\n") && len(s) > 0 {
+			buf.WriteByte('\n')
+		}
+		buf.WriteString(ManagedOpen)
+		buf.Write(wantRegion)
+		buf.WriteString(ManagedClose)
+		buf.WriteByte('\n')
+		return buf.Bytes(), true
 	}
 	openEnd := i + len(ManagedOpen)
 	j := strings.Index(s[openEnd:], ManagedClose)
 	if j < 0 {
+		// An open marker with no close is malformed — not a well-formed region we
+		// can safely swap. Treat as un-mergeable (CONFLICT) rather than guess where
+		// the region ends.
 		return nil, false
 	}
 	closeStart := openEnd + j
@@ -78,12 +103,14 @@ func MergeManaged(doc, want []byte) (merged []byte, ok bool) {
 // markers. It is the in-place merge path — the one deliberate exception to routing
 // every write through fsutil.WriteGuarded: WriteGuarded is whole-file
 // (O_EXCL-or-truncate) and cannot preserve a slice, so this reads the existing
-// hub, swaps only its managed region, and writes the result atomically via a
-// sibling temp file + rename so an interrupted merge can never truncate the user's
-// hub — a reader sees the old file or the new one, never a partial.
+// hub, updates only its managed region (swapping an existing one, or appending a
+// wrapped region to a markerless hub — see MergeManaged), and writes the result
+// atomically via a sibling temp file + rename so an interrupted merge can never
+// truncate the user's hub — a reader sees the old file or the new one, never a
+// partial.
 //
-// It returns an error if the on-disk hub has no well-formed managed region (the
-// caller should have classified that as CONFLICT, not MERGE).
+// It returns an error only when the merge itself is impossible (want carries no
+// managed region — a programmer error, since want is the freshly-rendered hub).
 func InjectManaged(repoDir string, want []byte) error {
 	path := filepath.Join(repoDir, "AGENTS.md")
 	doc, err := os.ReadFile(path)
@@ -92,7 +119,7 @@ func InjectManaged(repoDir string, want []byte) error {
 	}
 	merged, ok := MergeManaged(doc, want)
 	if !ok {
-		return fmt.Errorf("%s: no managed region to merge into", "AGENTS.md")
+		return fmt.Errorf("%s: rendered hub carries no managed region to inject", "AGENTS.md")
 	}
 	tmp := path + ".gyroscope.tmp"
 	if err := os.WriteFile(tmp, merged, 0o644); err != nil {
