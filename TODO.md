@@ -90,6 +90,40 @@
 ## Persona wiring (config-driven — 2026-07-07)
 - [x] **Config-driven persona wiring (`docs/agents/`)** — `spokes.personas` is now a four-state enum (`unknown|on|skipped|off`, back-compat with the bool); the hub carries a standing "ask when unknown" directive and the SessionStart hook cats `gyroscope.json` so the state is in context (hook stays pure `cat`). `gyroscope agents set <state>` records decisions; the skill reads a user-chosen template dir, customizes personas to this repo, and writes `docs/agents/*.md`. ADR 0005. Branch `feat/persona-wiring`.
 
+## DX convergence — merge-safe init + fix loop (2026-07-08)
+> Goal: kill the "refuse all-or-nothing vs `--force` clobber" choice and the
+> "skill or binary?" confusion. Make `init` idempotent + merge-safe, expose a fix
+> loop, unify the two tools. Design rationale: conversation 2026-07-08. Dissolves
+> the buckle-migration pain, the custom-route-trips-`check` edge, and the collision
+> refuse in one design move. Write an ADR for the managed-block standard change.
+
+- [ ] **D1 Per-file convergence classifier.** `init` dry-run classifies each
+  destination: NEW / OK (present & conformant) / MERGE (present, missing managed
+  content) / CONFLICT (user content differs). Print per-file status instead of the
+  all-or-nothing collision refuse. Evolve `existingCollisions` (`init.go:154`) into
+  a classifier. TDD.
+- [ ] **D2 Managed-block boundary for the hub.** Generalize the existing
+  `<!-- gyroscope:custom-routes -->` marker to a full managed region in `AGENTS.md`:
+  gyroscope owns only content between `<!-- gyroscope:managed -->` /
+  `<!-- /gyroscope -->`; everything outside is the user's — untouched, invisible to
+  `check`. Fixes buckle merge + custom-routes edge + idempotent re-init. Update
+  `check`'s Routes comparison to read only the managed region. **Needs an ADR** —
+  breaking change to the standard's hub format.
+- [ ] **D3 `init --apply` merge-safe.** Apply the NEW + MERGE subset automatically
+  (create missing files; inject missing managed content into an existing hub). Only
+  a true CONFLICT needs `--force`. Whole-file writes keep `fsutil.WriteGuarded`;
+  in-place managed-block injection is a new merge path (still atomic temp+rename).
+- [ ] **D4 `check --fix` (or `init --fix`).** Auto-apply the safe convergence so
+  `check` (detect) and fix (converge) are symmetric. CI runs `check`; dev runs
+  `--fix`.
+- [ ] **D5 Unify binary + skill.** `install-skill` guarantees the binary is
+  resolvable (warn + install instructions when `gyroscope` isn't on PATH; skill
+  step 2 shells to it). Removes the "skill installed but binary absent → step 2
+  fails" trap.
+- Out of scope (deferred): full 3-way content merge (managed blocks get ~90% for
+  ~10% of the code — build only if blocks prove too weak). The binary stays
+  non-interactive; interactivity lives in the skill.
+
 ## Later — deferred (explicitly out of MVP)
 - [ ] **Zed enforcement adapter** — active `enforce.Adapter` for Zed (the passive `.rules` doc-target pointer already exists; this is the force-inject side, parallel to Claude's SessionStart hook / PI's `session_start` extension). Investigate Zed's injection mechanism (does its agent support a session-start hook / rule that force-reads the hub, or is `.rules` native-read only?). If native-read only, there may be nothing to enforce — document that outcome. Wire behind the `enforce` config section (`zed`, opt-in) if a mechanism exists.
 - [ ] **Cursor enforcement adapter** — active `enforce.Adapter` for Cursor (passive `.cursorrules` pointer already exists). Investigate Cursor's mechanism: `.cursor/rules/*.mdc` with `alwaysApply: true` (always-injected project rules) and/or Cursor hooks. An always-applied rule that force-reads the hub would be the enforcement analog. Wire behind the `enforce` config section (`cursor`, opt-in).
