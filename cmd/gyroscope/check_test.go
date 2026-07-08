@@ -126,6 +126,52 @@ func TestCheckFailsOnUnfilledPlaceholder(t *testing.T) {
 	}
 }
 
+func TestCheckOnStateRequiresPersonaFile(t *testing.T) {
+	dir := initAndFill(t)
+	var out, errb bytes.Buffer
+	if err := run([]string{"agents", "set", "on", dir}, &out, &errb); err != nil {
+		t.Fatalf("agents set on: %v (%s)", err, errb.String())
+	}
+	out.Reset()
+	errb.Reset()
+	err := run([]string{"check", dir}, &out, &errb)
+	if code := exitCodeOf(t, err); code != exitDrift {
+		t.Fatalf("on-state with no persona file should drift, got code %d (%v)", code, err)
+	}
+	if !strings.Contains(out.String(), "docs/agents/") {
+		t.Fatalf("drift should name docs/agents/, got: %s", out.String())
+	}
+	// Add a persona file → conformant.
+	if err := os.WriteFile(filepath.Join(dir, "docs", "agents", "code-reviewer.md"), []byte("# reviewer\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	out.Reset()
+	errb.Reset()
+	if err := run([]string{"check", dir}, &out, &errb); err != nil {
+		t.Fatalf("on-state with a persona file should be conformant, got %v\n%s", err, out.String())
+	}
+}
+
+func TestCheckFlagsMissingPersonasDirective(t *testing.T) {
+	dir := initAndFill(t)
+	hub, err := os.ReadFile(filepath.Join(dir, "AGENTS.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	stripped := strings.ReplaceAll(string(hub), "spokes.personas", "SPOKES-REMOVED")
+	if err := os.WriteFile(filepath.Join(dir, "AGENTS.md"), []byte(stripped), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	var out, errb bytes.Buffer
+	err = run([]string{"check", dir}, &out, &errb)
+	if code := exitCodeOf(t, err); code != exitDrift {
+		t.Fatalf("missing directive should drift, got code %d (%v)", code, err)
+	}
+	if !strings.Contains(out.String(), "personas directive") {
+		t.Fatalf("drift should mention the personas directive, got: %s", out.String())
+	}
+}
+
 func TestCheckPassesWithDisabledSpoke(t *testing.T) {
 	dir := t.TempDir()
 	// Context spoke off: neither CONTEXT.md nor its hub route should exist, and

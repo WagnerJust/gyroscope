@@ -142,6 +142,36 @@ func checkRepo(repoDir string, cfg config.Config) ([]string, error) {
 		}
 	}
 
+	// 7. When personas are enabled, the hub carries the standing personas directive.
+	if hubPresent && cfg.Spokes.Personas.Enabled() {
+		hub, err := os.ReadFile(filepath.Join(repoDir, "AGENTS.md"))
+		if err != nil {
+			return nil, err
+		}
+		if !strings.Contains(string(hub), standard.PersonasDirective(cfg)) {
+			problems = append(problems, "AGENTS.md: personas directive missing or altered (run `gyroscope init`)")
+		}
+	}
+
+	// 8. State `on` means personas are wired: at least one non-README file under
+	// docs/agents/.
+	if cfg.Spokes.Personas == config.PersonaOn {
+		entries, err := os.ReadDir(filepath.Join(repoDir, "docs", "agents"))
+		if err != nil && !os.IsNotExist(err) {
+			return nil, err
+		}
+		wired := false
+		for _, e := range entries {
+			if !e.IsDir() && e.Name() != "README.md" {
+				wired = true
+				break
+			}
+		}
+		if !wired {
+			problems = append(problems, "docs/agents/: personas state is `on` but no persona files present (only README)")
+		}
+	}
+
 	// 4. Every pointer file exists and carries the canonical routing line.
 	for _, t := range target.All() {
 		if !exists(t.Path) {
