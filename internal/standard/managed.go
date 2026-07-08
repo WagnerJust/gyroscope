@@ -2,6 +2,9 @@ package standard
 
 import (
 	"bytes"
+	"fmt"
+	"os"
+	"path/filepath"
 	"strings"
 )
 
@@ -68,4 +71,36 @@ func MergeManaged(doc, want []byte) (merged []byte, ok bool) {
 	buf.Write(wantRegion)
 	buf.WriteString(s[closeStart:])
 	return buf.Bytes(), true
+}
+
+// InjectManaged brings the managed region of the hub at repoDir/AGENTS.md current
+// with want (the freshly-rendered hub), preserving all user content outside the
+// markers. It is the in-place merge path — the one deliberate exception to routing
+// every write through fsutil.WriteGuarded: WriteGuarded is whole-file
+// (O_EXCL-or-truncate) and cannot preserve a slice, so this reads the existing
+// hub, swaps only its managed region, and writes the result atomically via a
+// sibling temp file + rename so an interrupted merge can never truncate the user's
+// hub — a reader sees the old file or the new one, never a partial.
+//
+// It returns an error if the on-disk hub has no well-formed managed region (the
+// caller should have classified that as CONFLICT, not MERGE).
+func InjectManaged(repoDir string, want []byte) error {
+	path := filepath.Join(repoDir, "AGENTS.md")
+	doc, err := os.ReadFile(path)
+	if err != nil {
+		return err
+	}
+	merged, ok := MergeManaged(doc, want)
+	if !ok {
+		return fmt.Errorf("%s: no managed region to merge into", "AGENTS.md")
+	}
+	tmp := path + ".gyroscope.tmp"
+	if err := os.WriteFile(tmp, merged, 0o644); err != nil {
+		return err
+	}
+	if err := os.Rename(tmp, path); err != nil {
+		os.Remove(tmp)
+		return err
+	}
+	return nil
 }

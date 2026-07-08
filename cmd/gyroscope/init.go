@@ -11,7 +11,6 @@ import (
 	"github.com/WagnerJust/gyroscope/internal/config"
 	"github.com/WagnerJust/gyroscope/internal/enforce"
 	"github.com/WagnerJust/gyroscope/internal/standard"
-	"github.com/WagnerJust/gyroscope/internal/target"
 )
 
 func newInitCmd(stdout io.Writer) *cobra.Command {
@@ -57,39 +56,17 @@ func newInitCmd(stdout io.Writer) *cobra.Command {
 				for _, a := range adapters {
 					fmt.Fprintf(stdout, "  %s\n", a.PlanLine(paths))
 				}
+				// The merge-safe apply writes NEW + MERGE automatically; only a
+				// CONFLICT needs --force. Surface that when any conflict is present.
+				if c := conflicts(items); len(c) > 0 {
+					fmt.Fprintf(stdout, "\n%d conflict(s) need --force: %s\n", len(c), strings.Join(c, ", "))
+				}
 				fmt.Fprintln(stdout, "\nNothing written. Re-run with --apply.")
 				return nil
 			}
 
-			if !force {
-				if clashes := preexisting(items); len(clashes) > 0 {
-					return errCannotRun(fmt.Errorf("refusing to overwrite existing files (use --force): %s", strings.Join(clashes, ", ")))
-				}
-			}
-
-			written, err := standard.Write(abs, files, force)
-			if err != nil {
-				return errCannotRun(err)
-			}
-			for _, w := range written {
-				fmt.Fprintf(stdout, "wrote %s\n", w)
-			}
-			for _, t := range target.All() {
-				if err := target.WritePointer(abs, t, force); err != nil {
-					return errCannotRun(err)
-				}
-				fmt.Fprintf(stdout, "wrote %s (pointer)\n", t.Path)
-			}
-			for _, a := range adapters {
-				changed, err := a.Apply(abs, paths)
-				if err != nil {
-					return errCannotRun(err)
-				}
-				if changed {
-					fmt.Fprintf(stdout, "installed enforcement (%s): %s\n", a.ID(), a.PlanLine(paths))
-				} else {
-					fmt.Fprintf(stdout, "enforcement (%s) already present\n", a.ID())
-				}
+			if err := applyConverge(stdout, abs, items, adapters, paths, force); err != nil {
+				return err
 			}
 			return nil
 		},

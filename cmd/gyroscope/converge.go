@@ -2,10 +2,15 @@ package main
 
 import (
 	"bytes"
+	"fmt"
+	"io"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/WagnerJust/gyroscope/internal/config"
+	"github.com/WagnerJust/gyroscope/internal/enforce"
+	"github.com/WagnerJust/gyroscope/internal/fsutil"
 	"github.com/WagnerJust/gyroscope/internal/standard"
 	"github.com/WagnerJust/gyroscope/internal/target"
 )
@@ -127,15 +132,66 @@ func conflicts(items []convergeItem) []string {
 	return out
 }
 
-// preexisting returns every destination that already exists on disk (anything
-// not NEW). It is the all-or-nothing collision set the non-force apply refuses on
-// until the merge-safe apply (D3) narrows the refusal to genuine conflicts.
-func preexisting(items []convergeItem) []string {
-	var out []string
-	for _, it := range items {
-		if it.State != stateNew {
-			out = append(out, it.Dest)
+// applyConverge writes the safe convergence for the classified items and installs
+// the enforcement adapters. It is merge-safe (D3): NEW files are created, a hub's
+// managed region is injected in place (MERGE), and OK files are skipped. A genuine
+// CONFLICT — a whole file that differs with no managed region to merge into —
+// refuses unless force is set, and the refusal is all-or-nothing: nothing is
+// written when an unforced conflict exists. With force, conflicts are overwritten.
+//
+// It is shared by `init --apply` and `check --fix` so detect and converge stay
+// symmetric.
+func applyConverge(stdout io.Writer, abs string, items []convergeItem, adapters []enforce.Adapter, paths []string, force bool) error {
+	if !force {
+		if clashes := conflicts(items); len(clashes) > 0 {
+			return errCannotRun(fmt.Errorf("refusing to overwrite conflicting files (use --force): %s", strings.Join(clashes, ", ")))
 		}
 	}
-	return out
+
+	wroteLocal := false
+	for _, it := range items {
+		switch it.State {
+		case stateOK:
+			// Already current — nothing to do.
+			continue
+		case stateMerge:
+			// In-place managed-region injection (the hub). Atomic temp+rename.
+			if err := standard.InjectManaged(abs, it.Want); err != nil {
+				return errCannotRun(err)
+			}
+			fmt.Fprintf(stdout, "merged %s (managed region)\n", it.Dest)
+		case stateNew:
+			if err := fsutil.WriteGuarded(abs, it.Dest, it.Want, false); err != nil {
+				return errCannotRun(err)
+			}
+			fmt.Fprintf(stdout, "wrote %s\n", it.Dest)
+		case stateConflict:
+			// Only reached with force (the guard above refused otherwise).
+			if err := fsutil.WriteGuarded(abs, it.Dest, it.Want, true); err != nil {
+				return errCannotRun(err)
+			}
+			fmt.Fprintf(stdout, "overwrote %s (--force)\n", it.Dest)
+		}
+		if strings.HasPrefix(it.Dest, ".local/") {
+			wroteLocal = true
+		}
+	}
+	if wroteLocal {
+		if err := standard.EnsureLocalGitignore(abs); err != nil {
+			return errCannotRun(err)
+		}
+	}
+
+	for _, a := range adapters {
+		changed, err := a.Apply(abs, paths)
+		if err != nil {
+			return errCannotRun(err)
+		}
+		if changed {
+			fmt.Fprintf(stdout, "installed enforcement (%s): %s\n", a.ID(), a.PlanLine(paths))
+		} else {
+			fmt.Fprintf(stdout, "enforcement (%s) already present\n", a.ID())
+		}
+	}
+	return nil
 }

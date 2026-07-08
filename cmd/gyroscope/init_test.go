@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/WagnerJust/gyroscope/internal/config"
+	"github.com/WagnerJust/gyroscope/internal/standard"
 )
 
 func TestInitDryRunWritesNothing(t *testing.T) {
@@ -171,16 +172,105 @@ func TestInitApplyIsAllOrNothing(t *testing.T) {
 	}
 }
 
-func TestInitApplyRefusesOverwriteWithoutForce(t *testing.T) {
+func TestInitApplyIsIdempotent(t *testing.T) {
 	dir := t.TempDir()
 	var out, errb bytes.Buffer
 	if err := run([]string{"init", dir, "--apply"}, &out, &errb); err != nil {
 		t.Fatalf("first apply: %v (%s)", err, errb.String())
 	}
-	// A second --apply without --force must refuse to clobber the standard
-	// (protecting content the companion skill may have filled in).
-	if err := run([]string{"init", dir, "--apply"}, &out, &errb); err == nil {
-		t.Fatal("second apply without --force should refuse to overwrite")
+	before, err := os.ReadFile(filepath.Join(dir, "AGENTS.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	// A second --apply with everything already current must SUCCEED (no --force
+	// needed) and change nothing — init is merge-safe and idempotent (D3).
+	out.Reset()
+	errb.Reset()
+	if err := run([]string{"init", dir, "--apply"}, &out, &errb); err != nil {
+		t.Fatalf("re-apply on a current repo should succeed, got %v (%s)", err, errb.String())
+	}
+	after, err := os.ReadFile(filepath.Join(dir, "AGENTS.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(before) != string(after) {
+		t.Fatal("re-apply must not rewrite an already-current hub")
+	}
+}
+
+func TestInitApplyMergesManagedRegionIntoExistingHub(t *testing.T) {
+	dir := t.TempDir()
+	// The user already has an AGENTS.md with their own prose and only an empty
+	// managed region. init --apply (no --force) must inject the managed content
+	// AND preserve the user's surrounding prose — a MERGE, not a refuse.
+	userHub := "# AGENTS.md\n\n" +
+		"Welcome to my repo — read the house rules below.\n\n" +
+		standard.ManagedOpen + "\n" + standard.ManagedClose + "\n\n" +
+		"## House rules (mine)\n\nBe kind. Ship small.\n"
+	if err := os.WriteFile(filepath.Join(dir, "AGENTS.md"), []byte(userHub), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	var out, errb bytes.Buffer
+	if err := run([]string{"init", dir, "--apply"}, &out, &errb); err != nil {
+		t.Fatalf("merge apply should succeed without --force, got %v (%s)", err, errb.String())
+	}
+	got, err := os.ReadFile(filepath.Join(dir, "AGENTS.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	s := string(got)
+	// User prose preserved.
+	if !strings.Contains(s, "Welcome to my repo") || !strings.Contains(s, "## House rules (mine)") {
+		t.Fatalf("merge must preserve the user's content, got:\n%s", s)
+	}
+	// Managed content injected (a real route now lives inside the region).
+	if !strings.Contains(s, "**Build, test, conventions** → `docs/agents.md`.") {
+		t.Fatalf("merge must inject the managed routes, got:\n%s", s)
+	}
+	// Other planned files were created too (NEW subset applied).
+	if _, err := os.Stat(filepath.Join(dir, "CONTEXT.md")); err != nil {
+		t.Errorf("merge apply should also create the NEW files: %v", err)
+	}
+	// And the repo is conformant after the merge.
+	fillPlaceholders(t, dir)
+	out.Reset()
+	errb.Reset()
+	if err := run([]string{"check", dir}, &out, &errb); err != nil {
+		t.Fatalf("repo should be conformant after a merge apply, got %v\n%s", err, out.String())
+	}
+}
+
+func TestInitApplyRefusesConflictWithoutForce(t *testing.T) {
+	dir := t.TempDir()
+	// A foreign pointer file with no managed region is a CONFLICT: init --apply
+	// must refuse without --force and write nothing (all-or-nothing on conflict).
+	if err := os.WriteFile(filepath.Join(dir, "CLAUDE.md"), []byte("my own claude notes\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	var out, errb bytes.Buffer
+	err := run([]string{"init", dir, "--apply"}, &out, &errb)
+	if err == nil {
+		t.Fatal("a CONFLICT must refuse without --force")
+	}
+	if !strings.Contains(err.Error(), "CLAUDE.md") {
+		t.Fatalf("refusal should name the conflicting file, got: %v", err)
+	}
+	// Nothing else written.
+	if _, err := os.Stat(filepath.Join(dir, "AGENTS.md")); !os.IsNotExist(err) {
+		t.Fatal("conflict refusal must be all-or-nothing: AGENTS.md must not be written")
+	}
+	// User's file untouched.
+	if b, _ := os.ReadFile(filepath.Join(dir, "CLAUDE.md")); string(b) != "my own claude notes\n" {
+		t.Fatal("conflicting file must be left untouched")
+	}
+	// With --force the conflict is overwritten.
+	out.Reset()
+	errb.Reset()
+	if err := run([]string{"init", dir, "--apply", "--force"}, &out, &errb); err != nil {
+		t.Fatalf("--force should resolve the conflict, got %v (%s)", err, errb.String())
+	}
+	if b, _ := os.ReadFile(filepath.Join(dir, "CLAUDE.md")); !strings.Contains(string(b), "read AGENTS.md") {
+		t.Fatal("--force should have written the canonical routing line")
 	}
 }
 

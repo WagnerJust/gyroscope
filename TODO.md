@@ -116,10 +116,15 @@
   invisible; a hub with no region is drift). Repo's own `AGENTS.md` migrated to the
   managed-block form. ADR 0007. New "Managed region" term in `CONTEXT.md`. Commit
   `<D2>`.
-- [ ] **D3 `init --apply` merge-safe.** Apply the NEW + MERGE subset automatically
+- [x] **D3 `init --apply` merge-safe.** Apply the NEW + MERGE subset automatically
   (create missing files; inject missing managed content into an existing hub). Only
   a true CONFLICT needs `--force`. Whole-file writes keep `fsutil.WriteGuarded`;
   in-place managed-block injection is a new merge path (still atomic temp+rename).
+  — `applyConverge` drives writes per classified item (shared by init and D4's
+  fix); `standard.InjectManaged` is the atomic temp+rename managed merge (the one
+  deliberate WriteGuarded exception, justified in a comment). init is now
+  idempotent; re-apply on a current repo writes nothing; conflicts refuse
+  all-or-nothing without `--force`. Commit `<D3>`.
 - [ ] **D4 `check --fix` (or `init --fix`).** Auto-apply the safe convergence so
   `check` (detect) and fix (converge) are symmetric. CI runs `check`; dev runs
   `--fix`.

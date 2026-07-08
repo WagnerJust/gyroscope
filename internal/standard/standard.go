@@ -182,6 +182,14 @@ func Write(repoDir string, files []File, force bool) (written []string, err erro
 	return written, nil
 }
 
+// EnsureLocalGitignore appends ".local/" to repoDir/.gitignore when it is not
+// already listed, the same mutation Write performs when a .local/ spoke is
+// written. The merge-safe apply calls it directly, since it drives writes
+// per-file rather than through Write.
+func EnsureLocalGitignore(repoDir string) error {
+	return ensureGitignored(repoDir, ".local/")
+}
+
 func ensureGitignored(repoDir, pattern string) error {
 	path := filepath.Join(repoDir, ".gitignore")
 	b, err := os.ReadFile(path)
