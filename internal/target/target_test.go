@@ -6,6 +6,30 @@ import (
 	"testing"
 )
 
+func TestRegistryHasExpectedTargets(t *testing.T) {
+	want := map[string]string{
+		"claude":   "CLAUDE.md",
+		"gemini":   "GEMINI.md",
+		"cursor":   ".cursorrules",
+		"windsurf": ".windsurfrules",
+		"cline":    ".clinerules",
+		"copilot":  ".github/copilot-instructions.md",
+		"zed":      ".rules",
+	}
+	for id, path := range want {
+		tgt, ok := ByID(id)
+		if !ok {
+			t.Fatalf("target %q missing from registry", id)
+		}
+		if tgt.Path != path {
+			t.Fatalf("target %q path = %q, want %q", id, tgt.Path, path)
+		}
+	}
+	if n := len(All()); n != len(want) {
+		t.Fatalf("registry has %d targets, want %d", n, len(want))
+	}
+}
+
 func TestWritePointerCreatesRoutingLine(t *testing.T) {
 	dir := t.TempDir()
 	tgt, ok := ByID("claude")

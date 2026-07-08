@@ -20,6 +20,11 @@ type Target struct {
 var registry = []Target{
 	{"claude", "Claude Code", "CLAUDE.md"},
 	{"gemini", "Gemini", "GEMINI.md"},
+	{"cursor", "Cursor", ".cursorrules"},
+	{"windsurf", "Windsurf", ".windsurfrules"},
+	{"cline", "Cline", ".clinerules"},
+	{"copilot", "GitHub Copilot", ".github/copilot-instructions.md"},
+	{"zed", "Zed", ".rules"},
 }
 
 func All() []Target { return append([]Target(nil), registry...) }

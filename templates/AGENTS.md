@@ -12,5 +12,10 @@ These defer to this hub — keep each to the single routing line:
 
 - `CLAUDE.md`
 - `GEMINI.md`
+- `.cursorrules`
+- `.windsurfrules`
+- `.clinerules`
+- `.github/copilot-instructions.md`
+- `.rules`
 
 <!-- gyroscope:personas-directive -->
