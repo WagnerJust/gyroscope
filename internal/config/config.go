@@ -27,12 +27,61 @@ type CustomSpoke struct {
 	Dest string `json:"dest"`
 }
 
+// PersonaState is the lifecycle of the docs/agents/ personas spoke. Only
+// PersonaUnknown triggers the hub's "ask the user" directive; the rest are silent.
+// It unmarshals from either the legacy bool (true→unknown, false→off) or a string.
+type PersonaState string
+
+const (
+	PersonaUnknown PersonaState = "unknown"
+	PersonaOn      PersonaState = "on"
+	PersonaSkipped PersonaState = "skipped"
+	PersonaOff     PersonaState = "off"
+)
+
+// Enabled reports whether the personas spoke exists at all (route + README). Only
+// PersonaOff drops it.
+func (p PersonaState) Enabled() bool { return p != PersonaOff }
+
+// IsUnknown reports whether the persona decision is still pending (nudge state).
+func (p PersonaState) IsUnknown() bool { return p == PersonaUnknown }
+
+// Valid reports whether p is one of the four known states.
+func (p PersonaState) Valid() bool {
+	switch p {
+	case PersonaUnknown, PersonaOn, PersonaSkipped, PersonaOff:
+		return true
+	}
+	return false
+}
+
+func (p *PersonaState) UnmarshalJSON(b []byte) error {
+	var boolVal bool
+	if err := json.Unmarshal(b, &boolVal); err == nil {
+		if boolVal {
+			*p = PersonaUnknown
+		} else {
+			*p = PersonaOff
+		}
+		return nil
+	}
+	var s string
+	if err := json.Unmarshal(b, &s); err != nil {
+		return fmt.Errorf("personas: expected bool or string, got %s", b)
+	}
+	if !PersonaState(s).Valid() {
+		return fmt.Errorf("personas: unknown state %q (want unknown|on|skipped|off)", s)
+	}
+	*p = PersonaState(s)
+	return nil
+}
+
 type SpokeSet struct {
-	Context  bool `json:"context"`
-	Agents   bool `json:"agents"`
-	ADR      bool `json:"adr"`
-	Personas bool `json:"personas"`
-	Local    bool `json:"local"`
+	Context  bool         `json:"context"`
+	Agents   bool         `json:"agents"`
+	ADR      bool         `json:"adr"`
+	Personas PersonaState `json:"personas"`
+	Local    bool         `json:"local"`
 	// Contributing is a hub-routed spoke covering the contribution process; it
 	// defers to the agents spoke for conventions rather than duplicating them.
 	Contributing bool `json:"contributing"`
@@ -51,7 +100,7 @@ type SpokeSet struct {
 // Default is the opinionated standard: every spoke on.
 func Default() Config {
 	return Config{Spokes: SpokeSet{
-		Context: true, Agents: true, ADR: true, Personas: true, Local: true,
+		Context: true, Agents: true, ADR: true, Personas: PersonaUnknown, Local: true,
 		Contributing: true, PRTemplate: true, CommitConvention: true, State: true,
 	}}
 }

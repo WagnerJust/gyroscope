@@ -88,3 +88,60 @@ func TestLoadMalformedJSONReturnsError(t *testing.T) {
 		t.Fatalf("malformed JSON should return zero Config{}, got %+v", cfg)
 	}
 }
+
+func TestPersonasBoolBackCompat(t *testing.T) {
+	cases := map[string]PersonaState{
+		`{"spokes":{"personas":true}}`:  PersonaUnknown,
+		`{"spokes":{"personas":false}}`: PersonaOff,
+	}
+	for body, want := range cases {
+		dir := t.TempDir()
+		if err := os.WriteFile(filepath.Join(dir, "gyroscope.json"), []byte(body), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		cfg, err := Load(dir)
+		if err != nil {
+			t.Fatalf("%s: %v", body, err)
+		}
+		if cfg.Spokes.Personas != want {
+			t.Fatalf("%s: got %q, want %q", body, cfg.Spokes.Personas, want)
+		}
+	}
+}
+
+func TestPersonasStringStates(t *testing.T) {
+	for _, want := range []PersonaState{PersonaUnknown, PersonaOn, PersonaSkipped, PersonaOff} {
+		dir := t.TempDir()
+		body := `{"spokes":{"personas":"` + string(want) + `"}}`
+		if err := os.WriteFile(filepath.Join(dir, "gyroscope.json"), []byte(body), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		cfg, err := Load(dir)
+		if err != nil {
+			t.Fatalf("%s: %v", body, err)
+		}
+		if cfg.Spokes.Personas != want {
+			t.Fatalf("got %q, want %q", cfg.Spokes.Personas, want)
+		}
+	}
+}
+
+func TestPersonasBadStateWrapsFilename(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "gyroscope.json"), []byte(`{"spokes":{"personas":"wat"}}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	_, err := Load(dir)
+	if err == nil {
+		t.Fatal("expected error for unknown persona state")
+	}
+	if !strings.Contains(err.Error(), "gyroscope.json") || !strings.Contains(err.Error(), "wat") {
+		t.Fatalf("error should name the file and the bad value: %v", err)
+	}
+}
+
+func TestDefaultPersonasUnknown(t *testing.T) {
+	if Default().Spokes.Personas != PersonaUnknown {
+		t.Fatalf("default personas should be unknown, got %q", Default().Spokes.Personas)
+	}
+}
