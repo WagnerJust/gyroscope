@@ -184,6 +184,45 @@ func TestInitApplyRefusesOverwriteWithoutForce(t *testing.T) {
 	}
 }
 
+func TestInitInstallsPIExtensionWhenEnabled(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "gyroscope.json"), []byte(`{"enforce":{"pi":true}}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	var out, errb bytes.Buffer
+	if err := run([]string{"init", dir, "--apply"}, &out, &errb); err != nil {
+		t.Fatalf("init --apply: %v (%s)", err, errb.String())
+	}
+	if _, err := os.Stat(filepath.Join(dir, ".pi", "extensions", "gyroscope-context.ts")); err != nil {
+		t.Fatalf("PI extension should be written when enabled: %v", err)
+	}
+}
+
+func TestInitDryRunListsPIExtensionWhenEnabled(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "gyroscope.json"), []byte(`{"enforce":{"pi":true}}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	var out, errb bytes.Buffer
+	if err := run([]string{"init", dir}, &out, &errb); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(out.String(), ".pi/extensions/gyroscope-context.ts") {
+		t.Fatalf("dry-run should list the PI extension, got:\n%s", out.String())
+	}
+}
+
+func TestInitSkipsPIExtensionByDefault(t *testing.T) {
+	dir := t.TempDir()
+	var out, errb bytes.Buffer
+	if err := run([]string{"init", dir, "--apply"}, &out, &errb); err != nil {
+		t.Fatalf("init --apply: %v (%s)", err, errb.String())
+	}
+	if _, err := os.Stat(filepath.Join(dir, ".pi")); !os.IsNotExist(err) {
+		t.Fatal("PI is opt-in; .pi/ should not be created by default")
+	}
+}
+
 func TestHookPathsCatGyroscopeJSONWhenPersonasEnabled(t *testing.T) {
 	cfg := config.Default() // personas unknown → enabled
 	got := hookPathsFor(cfg)

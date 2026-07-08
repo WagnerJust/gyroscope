@@ -38,7 +38,8 @@ func newInitCmd(stdout io.Writer) *cobra.Command {
 			if err != nil {
 				return errCannotRun(err)
 			}
-			hookCmd := enforce.SessionStartCommand(hookPathsFor(cfg)...)
+			paths := hookPathsFor(cfg)
+			adapters := enabledAdapters(cfg)
 
 			if !apply {
 				fmt.Fprintf(stdout, "gyroscope init (dry-run)\n  repo: %s\n", abs)
@@ -54,7 +55,9 @@ func newInitCmd(stdout io.Writer) *cobra.Command {
 				if plansLocalWrite(files) {
 					fmt.Fprintf(stdout, "  update: .gitignore (ensure .local/ is listed)\n")
 				}
-				fmt.Fprintf(stdout, "  merge: .claude/settings.json — SessionStart hook: %s\n", hookCmd)
+				for _, a := range adapters {
+					fmt.Fprintf(stdout, "  %s\n", a.PlanLine(paths))
+				}
 				fmt.Fprintln(stdout, "\nNothing written. Re-run with --apply.")
 				return nil
 			}
@@ -78,14 +81,16 @@ func newInitCmd(stdout io.Writer) *cobra.Command {
 				}
 				fmt.Fprintf(stdout, "wrote %s (pointer)\n", t.Path)
 			}
-			changed, err := (enforce.Claude{}).Install(abs, hookCmd)
-			if err != nil {
-				return errCannotRun(err)
-			}
-			if changed {
-				fmt.Fprintln(stdout, "installed SessionStart hook → .claude/settings.json")
-			} else {
-				fmt.Fprintln(stdout, "SessionStart hook already present")
+			for _, a := range adapters {
+				changed, err := a.Apply(abs, paths)
+				if err != nil {
+					return errCannotRun(err)
+				}
+				if changed {
+					fmt.Fprintf(stdout, "installed enforcement (%s): %s\n", a.ID(), a.PlanLine(paths))
+				} else {
+					fmt.Fprintf(stdout, "enforcement (%s) already present\n", a.ID())
+				}
 			}
 			return nil
 		},
@@ -120,6 +125,19 @@ func hookPathsFor(cfg config.Config) []string {
 		paths = append(paths, "gyroscope.json")
 	}
 	return paths
+}
+
+// enabledAdapters returns the enforcement adapters cfg turns on, in a stable
+// order. init installs each; check verifies each.
+func enabledAdapters(cfg config.Config) []enforce.Adapter {
+	var a []enforce.Adapter
+	if cfg.Enforce.Claude {
+		a = append(a, enforce.Claude{})
+	}
+	if cfg.Enforce.PI {
+		a = append(a, enforce.PI{})
+	}
+	return a
 }
 
 // plansLocalWrite reports whether any planned file lands under .local/, which is
