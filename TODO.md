@@ -97,11 +97,14 @@
 > the buckle-migration pain, the custom-route-trips-`check` edge, and the collision
 > refuse in one design move. Write an ADR for the managed-block standard change.
 
-- [ ] **D1 Per-file convergence classifier.** `init` dry-run classifies each
+- [x] **D1 Per-file convergence classifier.** `init` dry-run classifies each
   destination: NEW / OK (present & conformant) / MERGE (present, missing managed
   content) / CONFLICT (user content differs). Print per-file status instead of the
   all-or-nothing collision refuse. Evolve `existingCollisions` (`init.go:154`) into
-  a classifier. TDD.
+  a classifier. TDD. — `cmd/gyroscope/converge.go` classifier +
+  `internal/standard/managed.go` region primitives (`MergeManaged`); dry-run now
+  prints per-file state; hub template wrapped in `<!-- gyroscope:managed -->`.
+  `existingCollisions` retired for `preexisting`/`conflicts`. Commit `b2705b7`.
 - [ ] **D2 Managed-block boundary for the hub.** Generalize the existing
   `<!-- gyroscope:custom-routes -->` marker to a full managed region in `AGENTS.md`:
   gyroscope owns only content between `<!-- gyroscope:managed -->` /

@@ -3,7 +3,6 @@ package main
 import (
 	"fmt"
 	"io"
-	"os"
 	"path/filepath"
 	"strings"
 
@@ -40,14 +39,14 @@ func newInitCmd(stdout io.Writer) *cobra.Command {
 			}
 			paths := hookPathsFor(cfg)
 			adapters := enabledAdapters(cfg)
+			items := classify(abs, files)
 
 			if !apply {
 				fmt.Fprintf(stdout, "gyroscope init (dry-run)\n  repo: %s\n", abs)
-				for _, f := range files {
-					fmt.Fprintf(stdout, "  write: %s\n", f.Dest)
-				}
-				for _, t := range target.All() {
-					fmt.Fprintf(stdout, "  write: %s (pointer)\n", t.Path)
+				// Per-file convergence: NEW (create) / OK (already current) /
+				// MERGE (inject the managed region) / CONFLICT (differs, needs --force).
+				for _, it := range items {
+					fmt.Fprintf(stdout, "  %-8s %s\n", it.State, it.Dest)
 				}
 				// Write() appends .local/ to .gitignore whenever any planned file
 				// lands under .local/ (the local-notes or local-todo spoke);
@@ -63,7 +62,7 @@ func newInitCmd(stdout io.Writer) *cobra.Command {
 			}
 
 			if !force {
-				if clashes := existingCollisions(abs, files); len(clashes) > 0 {
+				if clashes := preexisting(items); len(clashes) > 0 {
 					return errCannotRun(fmt.Errorf("refusing to overwrite existing files (use --force): %s", strings.Join(clashes, ", ")))
 				}
 			}
@@ -149,26 +148,4 @@ func plansLocalWrite(files []standard.File) bool {
 		}
 	}
 	return false
-}
-
-// existingCollisions returns the repo-relative destinations that init would
-// write with O_EXCL (standard files plus pointer files) but which already
-// exist under abs. It intentionally excludes .claude/settings.json, which is
-// installed via a preserving merge rather than a clobbering write. A non-empty
-// result means --apply (without --force) must refuse before writing anything.
-func existingCollisions(abs string, files []standard.File) []string {
-	var clashes []string
-	dests := make([]string, 0, len(files)+len(target.All()))
-	for _, f := range files {
-		dests = append(dests, f.Dest)
-	}
-	for _, t := range target.All() {
-		dests = append(dests, t.Path)
-	}
-	for _, d := range dests {
-		if _, err := os.Stat(filepath.Join(abs, d)); err == nil {
-			clashes = append(clashes, d)
-		}
-	}
-	return clashes
 }
