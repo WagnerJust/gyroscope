@@ -65,7 +65,7 @@ func newInitCmd(stdout io.Writer) *cobra.Command {
 				return nil
 			}
 
-			if err := applyConverge(stdout, abs, items, adapters, paths, force); err != nil {
+			if err := applyConverge(stdout, abs, items, adapters, paths, force, false); err != nil {
 				return err
 			}
 			return nil

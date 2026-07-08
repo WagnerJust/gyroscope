@@ -15,9 +15,10 @@ so following the docs, and resuming work, isn't left to chance.
     gyroscope install-skill --apply      # put the /gyroscope skill in ~/.claude/skills
     # then, in your agent:  /gyroscope   # interview → writes the standard
     # or non-interactively:
-    gyroscope init            # dry-run: show what would be written
-    gyroscope init --apply    # write the standard + pointer + hook
+    gyroscope init            # dry-run: classify each file NEW/OK/MERGE/CONFLICT
+    gyroscope init --apply    # write the standard + pointer + hook (merge-safe, idempotent)
     gyroscope check           # read-only: verify a repo still conforms (0=ok, 1=drift, 2=error)
+    gyroscope check --fix     # auto-apply the safe convergence, then re-check
 
 ## Configure (optional)
 
@@ -45,4 +46,10 @@ non-hub spokes on session start (PI reads `AGENTS.md` natively, so the hub is no
 re-injected). PI loads the extension and reads `AGENTS.md` only after you `/trust`
 the project in PI — gyroscope never writes PI's trust file.
 
-`gyroscope init --apply` refuses to overwrite existing files; pass `--force` to overwrite.
+`gyroscope init --apply` is merge-safe and idempotent: it classifies each
+destination NEW / OK / MERGE / CONFLICT, creates the NEW files, injects the hub's
+managed region (`<!-- gyroscope:managed -->` … `<!-- /gyroscope -->`) into an
+existing hub while leaving your surrounding content untouched, and skips anything
+already current. Only a genuine CONFLICT — a whole file that differs with no
+managed region to merge into — needs `--force`. `gyroscope check --fix` applies the
+same safe convergence, then re-checks; unresolved conflicts still report as drift.

@@ -21,7 +21,8 @@ import (
 // drift is found, exitCannotRun for a genuine error (bad path, I/O, malformed
 // config).
 func newCheckCmd(stdout io.Writer) *cobra.Command {
-	return &cobra.Command{
+	var fix bool
+	cmd := &cobra.Command{
 		Use:   "check [repo-path]",
 		Short: "Verify a repo still conforms to the standard gyroscope would produce (read-only).",
 		Args:  cobra.MaximumNArgs(1),
@@ -45,6 +46,25 @@ func newCheckCmd(stdout io.Writer) *cobra.Command {
 			if err != nil {
 				return errCannotRun(err)
 			}
+
+			// --fix makes check symmetric with init: it auto-applies the safe
+			// convergence (create NEW files, inject the hub's managed region) and
+			// leaves genuine conflicts untouched, so `check` (detect) and fix
+			// (converge) share one code path. Conflicts still surface as drift
+			// below — --fix never clobbers user content.
+			if fix {
+				files, err := standard.Plan(cfg)
+				if err != nil {
+					return errCannotRun(err)
+				}
+				items := classify(abs, files)
+				adapters := enabledAdapters(cfg)
+				paths := hookPathsFor(cfg)
+				if err := applyConverge(stdout, abs, items, adapters, paths, false, true); err != nil {
+					return err
+				}
+			}
+
 			problems, err := checkRepo(abs, cfg)
 			if err != nil {
 				return errCannotRun(err)
@@ -59,6 +79,9 @@ func newCheckCmd(stdout io.Writer) *cobra.Command {
 			return errDrift(fmt.Errorf("%d nonconformance(s) found in %s", len(problems), abs))
 		},
 	}
+	f := cmd.Flags()
+	f.BoolVar(&fix, "fix", false, "Auto-apply the safe convergence (create NEW files, merge the hub's managed region); conflicts still report as drift.")
+	return cmd
 }
 
 // checkRepo verifies that repoDir still matches the standard gyroscope would write

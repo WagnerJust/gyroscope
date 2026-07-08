@@ -125,9 +125,12 @@
   deliberate WriteGuarded exception, justified in a comment). init is now
   idempotent; re-apply on a current repo writes nothing; conflicts refuse
   all-or-nothing without `--force`. Commit `<D3>`.
-- [ ] **D4 `check --fix` (or `init --fix`).** Auto-apply the safe convergence so
+- [x] **D4 `check --fix` (or `init --fix`).** Auto-apply the safe convergence so
   `check` (detect) and fix (converge) are symmetric. CI runs `check`; dev runs
-  `--fix`.
+  `--fix`. — `check --fix` runs the shared `applyConverge` in skip-conflicts mode
+  (create NEW, merge the hub's managed region), then re-checks; conflicts are never
+  clobbered and still surface as drift (exit 1). README documents both. Commit
+  `<D4>`.
 - [ ] **D5 Unify binary + skill.** `install-skill` guarantees the binary is
   resolvable (warn + install instructions when `gyroscope` isn't on PATH; skill
   step 2 shells to it). Removes the "skill installed but binary absent → step 2

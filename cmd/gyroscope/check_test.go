@@ -258,6 +258,83 @@ func TestCheckFailsWhenManagedRegionMissing(t *testing.T) {
 	}
 }
 
+func TestCheckFixConvergesMissingSpoke(t *testing.T) {
+	dir := initAndFill(t)
+	// Introduce drift: delete a ready-to-use (placeholder-free) spoke. --fix
+	// re-creates it, and the repo is conformant again. (A placeholder-bearing
+	// spoke would come back as a raw scaffold — structure only — because the
+	// binary never fills placeholders; that is the skill's job.)
+	if err := os.Remove(filepath.Join(dir, "CONTRIBUTING.md")); err != nil {
+		t.Fatal(err)
+	}
+	var out, errb bytes.Buffer
+	if err := run([]string{"check", dir, "--fix"}, &out, &errb); err != nil {
+		t.Fatalf("check --fix should converge and exit 0, got %v\n%s", err, out.String())
+	}
+	if _, err := os.Stat(filepath.Join(dir, "CONTRIBUTING.md")); err != nil {
+		t.Fatalf("check --fix should have re-created the missing spoke: %v", err)
+	}
+	// A plain check afterward is conformant.
+	out.Reset()
+	errb.Reset()
+	if err := run([]string{"check", dir}, &out, &errb); err != nil {
+		t.Fatalf("repo should be conformant after --fix, got %v\n%s", err, out.String())
+	}
+}
+
+func TestCheckFixMergesManagedRegion(t *testing.T) {
+	dir := initAndFill(t)
+	// Drift the hub's managed region (blank it out) but keep user content around it.
+	hub, err := os.ReadFile(filepath.Join(dir, "AGENTS.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	region, ok := standard.ManagedRegion(hub)
+	if !ok {
+		t.Fatal("test hub should have a managed region")
+	}
+	drifted := strings.Replace(string(hub),
+		standard.ManagedOpen+string(region)+standard.ManagedClose,
+		standard.ManagedOpen+"\n"+standard.ManagedClose, 1)
+	drifted += "\n## User addition\n\nkeep me\n"
+	if err := os.WriteFile(filepath.Join(dir, "AGENTS.md"), []byte(drifted), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	var out, errb bytes.Buffer
+	if err := run([]string{"check", dir, "--fix"}, &out, &errb); err != nil {
+		t.Fatalf("check --fix should merge the managed region, got %v\n%s", err, out.String())
+	}
+	got, err := os.ReadFile(filepath.Join(dir, "AGENTS.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(got), "keep me") {
+		t.Fatal("--fix must preserve user content outside the managed region")
+	}
+	if !strings.Contains(string(got), "docs/agents.md") {
+		t.Fatal("--fix must re-inject the managed routes")
+	}
+}
+
+func TestCheckFixRefusesConflict(t *testing.T) {
+	dir := initAndFill(t)
+	// A CONFLICT (foreign pointer with no managed region) is NOT auto-fixed — that
+	// would clobber user content. --fix converges the safe subset and still reports
+	// the conflict as drift (exit 1), so CI/dev see it needs --force.
+	if err := os.WriteFile(filepath.Join(dir, "CLAUDE.md"), []byte("my notes, no routing line\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	var out, errb bytes.Buffer
+	err := run([]string{"check", dir, "--fix"}, &out, &errb)
+	if code := exitCodeOf(t, err); code != exitDrift {
+		t.Fatalf("--fix with an unresolved conflict should still report drift, got code %d (%v)", code, err)
+	}
+	// The user's conflicting file is left untouched (not clobbered).
+	if b, _ := os.ReadFile(filepath.Join(dir, "CLAUDE.md")); string(b) != "my notes, no routing line\n" {
+		t.Fatal("--fix must not clobber a conflicting file")
+	}
+}
+
 func TestCheckPassesWithDisabledSpoke(t *testing.T) {
 	dir := t.TempDir()
 	// Context spoke off: neither CONTEXT.md nor its hub route should exist, and

@@ -134,15 +134,20 @@ func conflicts(items []convergeItem) []string {
 
 // applyConverge writes the safe convergence for the classified items and installs
 // the enforcement adapters. It is merge-safe (D3): NEW files are created, a hub's
-// managed region is injected in place (MERGE), and OK files are skipped. A genuine
-// CONFLICT — a whole file that differs with no managed region to merge into —
-// refuses unless force is set, and the refusal is all-or-nothing: nothing is
-// written when an unforced conflict exists. With force, conflicts are overwritten.
+// managed region is injected in place (MERGE), and OK files are skipped.
 //
+// CONFLICT handling depends on mode:
+//   - init --apply (force=false): refuses all-or-nothing when any conflict exists.
+//   - init --apply --force: overwrites conflicts.
+//   - check --fix (skipConflicts=true): applies the safe subset and leaves
+//     conflicts untouched (never clobbers user content); the caller reports the
+//     remaining conflict as drift.
+//
+// force and skipConflicts are mutually exclusive knobs (force wins if both set).
 // It is shared by `init --apply` and `check --fix` so detect and converge stay
 // symmetric.
-func applyConverge(stdout io.Writer, abs string, items []convergeItem, adapters []enforce.Adapter, paths []string, force bool) error {
-	if !force {
+func applyConverge(stdout io.Writer, abs string, items []convergeItem, adapters []enforce.Adapter, paths []string, force, skipConflicts bool) error {
+	if !force && !skipConflicts {
 		if clashes := conflicts(items); len(clashes) > 0 {
 			return errCannotRun(fmt.Errorf("refusing to overwrite conflicting files (use --force): %s", strings.Join(clashes, ", ")))
 		}
@@ -166,6 +171,11 @@ func applyConverge(stdout io.Writer, abs string, items []convergeItem, adapters 
 			}
 			fmt.Fprintf(stdout, "wrote %s\n", it.Dest)
 		case stateConflict:
+			if skipConflicts {
+				// --fix never clobbers user content; the conflict stays and is
+				// reported as drift by the caller (needs --force to resolve).
+				continue
+			}
 			// Only reached with force (the guard above refused otherwise).
 			if err := fsutil.WriteGuarded(abs, it.Dest, it.Want, true); err != nil {
 				return errCannotRun(err)
