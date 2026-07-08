@@ -104,7 +104,7 @@
   a classifier. TDD. — `cmd/gyroscope/converge.go` classifier +
   `internal/standard/managed.go` region primitives (`MergeManaged`); dry-run now
   prints per-file state; hub template wrapped in `<!-- gyroscope:managed -->`.
-  `existingCollisions` retired for `preexisting`/`conflicts`. Commit `<D1>`.
+  `existingCollisions` retired for `preexisting`/`conflicts`. Commit `99a53c3`.
 - [x] **D2 Managed-block boundary for the hub.** Generalize the existing
   `<!-- gyroscope:custom-routes -->` marker to a full managed region in `AGENTS.md`:
   gyroscope owns only content between `<!-- gyroscope:managed -->` /
@@ -115,7 +115,7 @@
   region first (route/personas checks scoped to it; user content outside is
   invisible; a hub with no region is drift). Repo's own `AGENTS.md` migrated to the
   managed-block form. ADR 0007. New "Managed region" term in `CONTEXT.md`. Commit
-  `<D2>`.
+  `2d9b21c`.
 - [x] **D3 `init --apply` merge-safe.** Apply the NEW + MERGE subset automatically
   (create missing files; inject missing managed content into an existing hub). Only
   a true CONFLICT needs `--force`. Whole-file writes keep `fsutil.WriteGuarded`;
@@ -124,17 +124,21 @@
   fix); `standard.InjectManaged` is the atomic temp+rename managed merge (the one
   deliberate WriteGuarded exception, justified in a comment). init is now
   idempotent; re-apply on a current repo writes nothing; conflicts refuse
-  all-or-nothing without `--force`. Commit `<D3>`.
+  all-or-nothing without `--force`. Commit `35cfe88`.
 - [x] **D4 `check --fix` (or `init --fix`).** Auto-apply the safe convergence so
   `check` (detect) and fix (converge) are symmetric. CI runs `check`; dev runs
   `--fix`. — `check --fix` runs the shared `applyConverge` in skip-conflicts mode
   (create NEW, merge the hub's managed region), then re-checks; conflicts are never
   clobbered and still surface as drift (exit 1). README documents both. Commit
-  `<D4>`.
-- [ ] **D5 Unify binary + skill.** `install-skill` guarantees the binary is
+  `d135ba1`.
+- [x] **D5 Unify binary + skill.** `install-skill` guarantees the binary is
   resolvable (warn + install instructions when `gyroscope` isn't on PATH; skill
   step 2 shells to it). Removes the "skill installed but binary absent → step 2
-  fails" trap.
+  fails" trap. — `install-skill` now resolves `gyroscope` via `exec.LookPath`
+  (injectable `lookBinary` for tests): confirms the path when present, warns with a
+  `go install` instruction when absent (still installs the skill). SKILL.md step 2
+  documents the dependency + the merge-safe apply (final commit on branch
+  `feat/dx-convergence`).
 - Out of scope (deferred): full 3-way content merge (managed blocks get ~90% for
   ~10% of the code — build only if blocks prove too weak). The binary stays
   non-interactive; interactivity lives in the skill.

@@ -48,7 +48,12 @@ Placeholders: `{{...}}` are yours to fill in step 3; `<...>` form fields in
 1. Show the gathered answers and the exact list of files to be written. Get approval.
 2. Run the binary to write the standard, reconcile pointer files to the one routing
    line, and install the `SessionStart` hook (merged into `.claude/settings.json`,
-   never overwriting existing content).
+   never overwriting existing content). This step shells out to the `gyroscope`
+   binary — if `gyroscope` is not on PATH, `install-skill` already warned you and
+   printed the `go install` line; run that first, or the write step fails with a
+   bare "command not found". `init --apply` is merge-safe: it creates missing
+   files, injects the hub's managed region into an existing `AGENTS.md` without
+   touching your other content, and only a genuine CONFLICT needs `--force`.
 3. **Fill the scaffolds.** The binary writes them with `{{...}}` placeholders; you fill
    them from the approved answers. For each written spoke — `CONTEXT.md`,
    `docs/agents.md`, `docs/agents/README.md`, and the date in `docs/adr/0001-*` —

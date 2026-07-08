@@ -117,7 +117,7 @@ func enabledAdapters(cfg config.Config) []enforce.Adapter {
 }
 
 // plansLocalWrite reports whether any planned file lands under .local/, which is
-// what triggers standard.Write to append .local/ to .gitignore.
+// what triggers applyConverge to append .local/ to .gitignore.
 func plansLocalWrite(files []standard.File) bool {
 	for _, f := range files {
 		if strings.HasPrefix(f.Dest, ".local/") {
