@@ -126,6 +126,44 @@ func TestCheckFailsOnUnfilledPlaceholder(t *testing.T) {
 	}
 }
 
+// initAndFillPI is initAndFill with PI enforcement enabled.
+func initAndFillPI(t *testing.T) string {
+	t.Helper()
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "gyroscope.json"), []byte(`{"enforce":{"pi":true}}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	var out, errb bytes.Buffer
+	if err := run([]string{"init", dir, "--apply"}, &out, &errb); err != nil {
+		t.Fatalf("init --apply: %v (%s)", err, errb.String())
+	}
+	fillPlaceholders(t, dir)
+	return dir
+}
+
+func TestCheckPassesWithPIEnabled(t *testing.T) {
+	dir := initAndFillPI(t)
+	var out, errb bytes.Buffer
+	if err := run([]string{"check", dir}, &out, &errb); err != nil {
+		t.Fatalf("check should pass with PI enabled, got %v\n%s", err, out.String())
+	}
+}
+
+func TestCheckDriftsWhenPIExtensionMissing(t *testing.T) {
+	dir := initAndFillPI(t)
+	if err := os.Remove(filepath.Join(dir, ".pi", "extensions", "gyroscope-context.ts")); err != nil {
+		t.Fatal(err)
+	}
+	var out, errb bytes.Buffer
+	err := run([]string{"check", dir}, &out, &errb)
+	if code := exitCodeOf(t, err); code != exitDrift {
+		t.Fatalf("removing the PI extension should drift, got code %d (%v)", code, err)
+	}
+	if !strings.Contains(out.String(), "pi") {
+		t.Fatalf("drift should name the pi adapter, got: %s", out.String())
+	}
+}
+
 func TestCheckOnStateRequiresPersonaFile(t *testing.T) {
 	dir := initAndFill(t)
 	var out, errb bytes.Buffer

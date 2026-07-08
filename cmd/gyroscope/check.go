@@ -11,7 +11,6 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/WagnerJust/gyroscope/internal/config"
-	"github.com/WagnerJust/gyroscope/internal/enforce"
 	"github.com/WagnerJust/gyroscope/internal/standard"
 	"github.com/WagnerJust/gyroscope/internal/target"
 )
@@ -187,15 +186,16 @@ func checkRepo(repoDir string, cfg config.Config) ([]string, error) {
 		}
 	}
 
-	// 5. The SessionStart enforcement hook is installed with the config-aware
-	// command that init would write.
-	hookCmd := enforce.SessionStartCommand(hookPathsFor(cfg)...)
-	installed, err := (enforce.Claude{}).HasSessionStart(repoDir, hookCmd)
-	if err != nil {
-		return nil, err
-	}
-	if !installed {
-		problems = append(problems, fmt.Sprintf(".claude/settings.json: SessionStart hook missing or altered; expected command: %s", hookCmd))
+	// 5. Every enabled enforcement adapter's mechanism is installed and current.
+	paths := hookPathsFor(cfg)
+	for _, a := range enabledAdapters(cfg) {
+		installed, err := a.Verify(repoDir, paths)
+		if err != nil {
+			return nil, err
+		}
+		if !installed {
+			problems = append(problems, fmt.Sprintf("enforcement adapter %q: not installed or altered (run `gyroscope init`) — %s", a.ID(), a.PlanLine(paths)))
+		}
 	}
 
 	return problems, nil
