@@ -70,3 +70,35 @@ Placeholders: `{{...}}` are yours to fill in step 3; `<...>` form fields in
    output-side skill that makes replies terse while keeping code/commands byte-exact.
    It coexists with gyroscope's hook (both append-merge into `SessionStart`). Suggest,
    don't insist — it's a third-party tool, not part of the standard.
+
+## Agent personas (docs/agents/)
+
+The hub carries a standing rule: when `gyroscope.json` `spokes.personas` is
+`unknown`, ask the user about personas before other work. Also run this flow when
+the user invokes `/gyroscope` explicitly.
+
+1. **Ask:** "Wire agent personas for this repo now, or skip for now?"
+2. **Skip** → run `gyroscope agents set skipped`. Stop; do not revisit unless asked.
+3. **Wire** →
+   a. Ask for the persona template directory. Offer `~/Src/agency-agents` as a
+      guessed default, but do not persist the answer — ask again next time.
+   b. List the persona files under that directory (they are grouped by division,
+      e.g. `engineering/`, `testing/`). Present them and let the user pick a subset.
+   c. For each pick, read the template and **customize it to this repo**: keep the
+      useful framing, adapt language to this repo's stack, and strip content that
+      does not apply (web-only stacks, framework-specific tooling). Write the
+      result to `docs/agents/<name>.md` — one file per persona.
+   d. Run `gyroscope agents set on`.
+
+Persona-fit guidance for a Go/CLI backend repo:
+- code-reviewer templates → quality-review framing.
+- reality-checker templates → spec-review mindset (default to NEEDS WORK; verify
+  by reading code and running commands). Ignore any web/Playwright mechanics.
+- minimal-change / backend-architect templates → implementer framing (YAGNI,
+  minimal diff).
+- Avoid generic "senior web developer" personas — they inject irrelevant web/UI
+  concerns into a Go CLI.
+
+The binary never reads or writes persona content — that is entirely this skill's
+job. The binary only records the decision (`gyroscope agents set …`) and scaffolds
+the empty `docs/agents/` spoke.
