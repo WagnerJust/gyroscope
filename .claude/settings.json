@@ -4,7 +4,7 @@
       {
         "hooks": [
           {
-            "command": "cat AGENTS.md docs/agents.md TODO.md .local/todo.md .local/local.md gyroscope.json 2>/dev/null",
+            "command": "cat AGENTS.md docs/agents.md TODO.md .local/todo.md .local/local.md gyroscope.json 2>/dev/null || true",
             "type": "command"
           }
         ]

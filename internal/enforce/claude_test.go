@@ -48,7 +48,11 @@ func TestClaudePlanLineNamesTheHook(t *testing.T) {
 }
 
 func TestSessionStartCommand(t *testing.T) {
-	if got := SessionStartCommand("AGENTS.md", "docs/agents.md"); got != "cat AGENTS.md docs/agents.md 2>/dev/null" {
+	// `|| true` forces exit 0: a missing spoke (gyroscope.json is absent on the
+	// default config; .local/* absent in a fresh clone) makes cat exit non-zero,
+	// which the harness reports as a failed SessionStart hook. 2>/dev/null only
+	// silences the message, not the exit code.
+	if got := SessionStartCommand("AGENTS.md", "docs/agents.md"); got != "cat AGENTS.md docs/agents.md 2>/dev/null || true" {
 		t.Fatalf("unexpected command: %q", got)
 	}
 	// Omitting a path omits it from the command.

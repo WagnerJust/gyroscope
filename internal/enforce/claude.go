@@ -14,9 +14,13 @@ import (
 )
 
 // SessionStartCommand builds the hook command that cats the given repo-relative
-// paths into the session at startup. 2>/dev/null so a missing spoke never errors.
+// paths into the session at startup. 2>/dev/null silences the message for a
+// missing spoke, and `|| true` forces exit 0: cat still exits non-zero when a
+// path is absent (gyroscope.json is missing on the default config; .local/* is
+// absent in a fresh clone), which the harness would otherwise report as a failed
+// SessionStart hook.
 func SessionStartCommand(paths ...string) string {
-	return "cat " + strings.Join(paths, " ") + " 2>/dev/null"
+	return "cat " + strings.Join(paths, " ") + " 2>/dev/null || true"
 }
 
 type Claude struct{}
