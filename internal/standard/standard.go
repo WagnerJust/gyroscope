@@ -33,7 +33,7 @@ func Plan(cfg config.Config) ([]File, error) {
 		{cfg.Spokes.Agents, "templates/docs/agents.md", "docs/agents.md"},
 		{cfg.Spokes.ADR, "templates/docs/adr/TEMPLATE.md", "docs/adr/TEMPLATE.md"},
 		{cfg.Spokes.ADR, "templates/docs/adr/0001-record-architecture-decisions.md", "docs/adr/0001-record-architecture-decisions.md"},
-		{cfg.Spokes.Personas, "templates/docs/agents/README.md", "docs/agents/README.md"},
+		{cfg.Spokes.Personas.Enabled(), "templates/docs/agents/README.md", "docs/agents/README.md"},
 		{cfg.Spokes.Contributing, "templates/CONTRIBUTING.md", "CONTRIBUTING.md"},
 		{cfg.Spokes.State, "templates/TODO.md", "TODO.md"},
 		{cfg.Spokes.State, "templates/local-todo.md", ".local/todo.md"},
@@ -53,6 +53,7 @@ func Plan(cfg config.Config) ([]File, error) {
 		}
 		if e.dest == "AGENTS.md" {
 			b = renderRoutes(b, cfg)
+			b = renderPersonasDirective(b, cfg)
 		}
 		files = append(files, File{Dest: e.dest, Content: b})
 	}
@@ -82,6 +83,37 @@ func renderRoutes(hub []byte, cfg config.Config) []byte {
 	return []byte(strings.Replace(string(hub), routesMarker, Routes(cfg), 1))
 }
 
+// personasMarker is where the hub's standing personas directive is spliced in.
+const personasMarker = "<!-- gyroscope:personas-directive -->"
+
+// PersonasDirective returns the hub's standing instruction about the personas
+// lifecycle when the spoke is enabled, else "". It is the single source of truth
+// for the directive text, shared by renderPersonasDirective and by
+// `gyroscope check`, which compares it against the on-disk hub.
+func PersonasDirective(cfg config.Config) string {
+	if !cfg.Spokes.Personas.Enabled() {
+		return ""
+	}
+	return "## Personas\n\n" +
+		"If `gyroscope.json` `spokes.personas` is `unknown`, then before starting other work, " +
+		"ask the user whether to wire agent personas for this repo (run `/gyroscope`) or skip for now. " +
+		"When the state is `on`, `skipped`, or `off`, do nothing about this."
+}
+
+// renderPersonasDirective replaces personasMarker in the hub with the directive
+// for cfg. When the spoke is off the marker (and its preceding blank line) is
+// removed cleanly.
+func renderPersonasDirective(hub []byte, cfg config.Config) []byte {
+	d := PersonasDirective(cfg)
+	s := string(hub)
+	if d == "" {
+		s = strings.Replace(s, "\n\n"+personasMarker, "", 1)
+		s = strings.Replace(s, personasMarker, "", 1)
+		return []byte(s)
+	}
+	return []byte(strings.Replace(s, personasMarker, d, 1))
+}
+
 // Routes returns the hub's route block for cfg — the newline-joined bullets
 // renderRoutes splices into the hub. It is the single source of truth for the
 // route strings, shared by init (via renderRoutes) and by `gyroscope check`,
@@ -104,7 +136,7 @@ func routeLines(cfg config.Config) []string {
 		{cfg.Spokes.Contributing, "- **How changes get proposed & reviewed here** → `CONTRIBUTING.md`."},
 		{cfg.Spokes.Local, "- **Your** personal setup / stack (may differ from repo defaults) → `.local/local.md` (gitignored; may not exist)."},
 		{cfg.Spokes.ADR, "- **Why the code is shaped this way** → `docs/adr/` (architecture decisions)."},
-		{cfg.Spokes.Personas, "- **Specialized agent personas for this repo** → `docs/agents/`."},
+		{cfg.Spokes.Personas.Enabled(), "- **Specialized agent personas for this repo** → `docs/agents/`."},
 	}
 	var lines []string
 	for _, b := range builtins {

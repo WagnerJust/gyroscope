@@ -130,11 +130,42 @@ func TestPlanIncludesStateFiles(t *testing.T) {
 	}
 }
 
+func TestHubCarriesPersonasDirectiveWhenEnabled(t *testing.T) {
+	cfg := config.Default() // personas = unknown → enabled
+	files, err := Plan(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	hub := agentsContent(t, files)
+	if !strings.Contains(hub, "spokes.personas") {
+		t.Fatal("hub should carry the personas directive when the spoke is enabled")
+	}
+	if strings.Contains(hub, "<!-- gyroscope:personas-directive -->") {
+		t.Fatal("the personas marker should be replaced, not left in the hub")
+	}
+}
+
+func TestHubOmitsPersonasDirectiveWhenOff(t *testing.T) {
+	cfg := config.Default()
+	cfg.Spokes.Personas = config.PersonaOff
+	files, err := Plan(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	hub := agentsContent(t, files)
+	if strings.Contains(hub, "spokes.personas") {
+		t.Fatal("hub should not carry the personas directive when the spoke is off")
+	}
+	if strings.Contains(hub, "<!-- gyroscope:personas-directive -->") {
+		t.Fatal("the personas marker should be removed when off")
+	}
+}
+
 func TestHubOmitsDisabledSpokeRoutes(t *testing.T) {
 	cfg := config.Default()
 	cfg.Spokes.Context = false
 	cfg.Spokes.ADR = false
-	cfg.Spokes.Personas = false
+	cfg.Spokes.Personas = config.PersonaOff
 	files, err := Plan(cfg)
 	if err != nil {
 		t.Fatal(err)

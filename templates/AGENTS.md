@@ -12,3 +12,5 @@ These defer to this hub — keep each to the single routing line:
 
 - `CLAUDE.md`
 - `GEMINI.md`
+
+<!-- gyroscope:personas-directive -->
