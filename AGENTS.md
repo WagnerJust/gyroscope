@@ -18,3 +18,7 @@ These defer to this hub — keep each to the single routing line:
 
 - `CLAUDE.md`
 - `GEMINI.md`
+
+## Personas
+
+If `gyroscope.json` `spokes.personas` is `unknown`, then before starting other work, ask the user whether to wire agent personas for this repo (run `/gyroscope`) or skip for now. When the state is `on`, `skipped`, or `off`, do nothing about this.
