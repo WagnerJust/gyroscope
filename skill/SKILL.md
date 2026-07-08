@@ -102,3 +102,17 @@ Persona-fit guidance for a Go/CLI backend repo:
 The binary never reads or writes persona content — that is entirely this skill's
 job. The binary only records the decision (`gyroscope agents set …`) and scaffolds
 the empty `docs/agents/` spoke.
+
+## PI enforcement (opt-in)
+
+gyroscope installs enforcement per harness. Claude is on by default. To enforce
+the hub for the **PI** coding agent, enable it in `gyroscope.json`:
+
+```json
+{ "enforce": { "pi": true } }
+```
+
+Re-run `gyroscope init` to write `.pi/extensions/gyroscope-context.ts`. Then, in
+PI, run `/trust` once for this project — PI reads `AGENTS.md` and loads the
+extension only after the project is trusted. gyroscope does **not** write PI's
+trust decision; that is your security choice.

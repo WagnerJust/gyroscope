@@ -81,10 +81,12 @@
 - [x] `docs/adr/TEMPLATE.md` drifted from the shipped template. Realigned byte-for-byte.
 - [ ] (note, not fixed) `go build ./cmd/gyroscope` reports `dev (commit none, built unknown)` — no ldflags; `make build` is the versioned path. Expected, documented as the "quick local binary."
 
+## PI enforcement adapter (2026-07-07)
+- [x] **PI enforcement adapter** — `enforce.Adapter` interface extracted (`ID`/`PlanLine`/`Apply`/`Verify`); `PI{}` writes `.pi/extensions/gyroscope-context.ts` injecting the non-hub spokes on `session_start` via `pi.sendMessage` (hub read natively by PI, so excluded). New `enforce` config section (claude on, pi opt-in); init/check loop the enabled adapters; Claude wrappers keep its tested hook logic. Trust left to the user (`/trust`), not automated. ADR 0006. Branch `feat/pi-enforcement-adapter`.
+
 ## Persona wiring (config-driven — 2026-07-07)
 - [x] **Config-driven persona wiring (`docs/agents/`)** — `spokes.personas` is now a four-state enum (`unknown|on|skipped|off`, back-compat with the bool); the hub carries a standing "ask when unknown" directive and the SessionStart hook cats `gyroscope.json` so the state is in context (hook stays pure `cat`). `gyroscope agents set <state>` records decisions; the skill reads a user-chosen template dir, customizes personas to this repo, and writes `docs/agents/*.md`. ADR 0005. Branch `feat/persona-wiring`.
 
 ## Later — deferred (explicitly out of MVP)
 - [ ] **Native "terse" spoke (option c) — build if caveman-by-recommendation proves too weak.** Using caveman for now (see Post-MVP). The skill recommendation is discovery-only + setup-only; a gyroscope-owned terse spoke `cat` by the SessionStart hook would be *always-on*, dependency-free, and use the same mechanism caveman does (hook-injected rules) — no Node, no separate install, no skill nesting. Ship a static ruleset (drop filler/hedging/pleasantries; keep code, commands, and error strings byte-exact; **never** terse-ify security warnings or irreversible-action confirmations). Tradeoff vs caveman: no tuned levels / statusline / measurement. Wire as a `terse` `SpokeSet` toggle + `templates/docs/terse.md` + a `hookPathsFor` entry — mirror the `state` spoke. Context: caveman shrinks **output** tokens (~65%), leaves **input** untouched, so it never reduced the hook cost — it's the output-side complement to gyroscope's input-side docs.
-- [ ] PI coding tool enforcement adapter (next harness after Claude)
 - [ ] More doc-target tools beyond Claude Code

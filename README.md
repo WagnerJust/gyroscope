@@ -32,4 +32,17 @@ Spokes: `context` (CONTEXT.md), `agents` (docs/agents.md), `contributing`
 `commitConvention` (.gitmessage). The `AGENTS.md` hub is always written; disabling
 a spoke also prunes its hub route.
 
+### Enforcement adapters
+
+`enforce` selects which harnesses are force-fed the hub. `claude` is on by default
+(a `SessionStart` hook in `.claude/settings.json`). `pi` (the Pi Agent Harness) is
+opt-in — enable it and re-run init:
+
+    {"enforce": {"pi": true}}
+
+PI enforcement writes `.pi/extensions/gyroscope-context.ts`, which injects the
+non-hub spokes on session start (PI reads `AGENTS.md` natively, so the hub is not
+re-injected). PI loads the extension and reads `AGENTS.md` only after you `/trust`
+the project in PI — gyroscope never writes PI's trust file.
+
 `gyroscope init --apply` refuses to overwrite existing files; pass `--force` to overwrite.
