@@ -104,14 +104,18 @@
   a classifier. TDD. — `cmd/gyroscope/converge.go` classifier +
   `internal/standard/managed.go` region primitives (`MergeManaged`); dry-run now
   prints per-file state; hub template wrapped in `<!-- gyroscope:managed -->`.
-  `existingCollisions` retired for `preexisting`/`conflicts`. Commit `b2705b7`.
-- [ ] **D2 Managed-block boundary for the hub.** Generalize the existing
+  `existingCollisions` retired for `preexisting`/`conflicts`. Commit `<D1>`.
+- [x] **D2 Managed-block boundary for the hub.** Generalize the existing
   `<!-- gyroscope:custom-routes -->` marker to a full managed region in `AGENTS.md`:
   gyroscope owns only content between `<!-- gyroscope:managed -->` /
   `<!-- /gyroscope -->`; everything outside is the user's — untouched, invisible to
   `check`. Fixes buckle merge + custom-routes edge + idempotent re-init. Update
   `check`'s Routes comparison to read only the managed region. **Needs an ADR** —
-  breaking change to the standard's hub format.
+  breaking change to the standard's hub format. — `check` now extracts the managed
+  region first (route/personas checks scoped to it; user content outside is
+  invisible; a hub with no region is drift). Repo's own `AGENTS.md` migrated to the
+  managed-block form. ADR 0007. New "Managed region" term in `CONTEXT.md`. Commit
+  `<D2>`.
 - [ ] **D3 `init --apply` merge-safe.** Apply the NEW + MERGE subset automatically
   (create missing files; inject missing managed content into an existing hub). Only
   a true CONFLICT needs `--force`. Whole-file writes keep `fsutil.WriteGuarded`;

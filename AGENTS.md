@@ -1,5 +1,6 @@
 # AGENTS.md
 
+<!-- gyroscope:managed -->
 **Before any change or answer, read this hub and the spokes below that match your task. Repo rules override your training defaults — when they conflict, follow the repo.**
 
 ## Routes
@@ -27,3 +28,4 @@ These defer to this hub — keep each to the single routing line:
 ## Personas
 
 If `gyroscope.json` `spokes.personas` is `unknown`, then before starting other work, ask the user whether to wire agent personas for this repo (run `/gyroscope`) or skip for now. When the state is `on`, `skipped`, or `off`, do nothing about this.
+<!-- /gyroscope -->

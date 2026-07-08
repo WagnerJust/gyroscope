@@ -8,6 +8,8 @@ import (
 	"regexp"
 	"strings"
 	"testing"
+
+	"github.com/WagnerJust/gyroscope/internal/standard"
 )
 
 // placeholderRE matches a fill-once {{...}} scaffold marker, including one that
@@ -207,6 +209,52 @@ func TestCheckFlagsMissingPersonasDirective(t *testing.T) {
 	}
 	if !strings.Contains(out.String(), "personas directive") {
 		t.Fatalf("drift should mention the personas directive, got: %s", out.String())
+	}
+}
+
+func TestCheckIgnoresUserContentOutsideManagedRegion(t *testing.T) {
+	dir := initAndFill(t)
+	hub, err := os.ReadFile(filepath.Join(dir, "AGENTS.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	// A user adds their own prose AFTER the managed region. gyroscope owns only
+	// the managed block, so this must NOT be reported as drift, and any route-like
+	// bullet the user writes outside the block must NOT count as a hub route.
+	extra := string(hub) + "\n## My own section\n\n" +
+		"- **Something the user cares about** → `docs/mine.md`.\n"
+	if err := os.WriteFile(filepath.Join(dir, "AGENTS.md"), []byte(extra), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	var out, errb bytes.Buffer
+	if err := run([]string{"check", dir}, &out, &errb); err != nil {
+		t.Fatalf("user content outside the managed region must not drift, got %v\n%s", err, out.String())
+	}
+	if !strings.Contains(out.String(), "conformant") {
+		t.Fatalf("expected conformant, got: %s", out.String())
+	}
+}
+
+func TestCheckFailsWhenManagedRegionMissing(t *testing.T) {
+	dir := initAndFill(t)
+	// Strip the managed markers entirely: gyroscope can no longer locate its
+	// region, which is drift (the hub is no longer in the managed-block form).
+	hub, err := os.ReadFile(filepath.Join(dir, "AGENTS.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	stripped := strings.ReplaceAll(strings.ReplaceAll(string(hub),
+		standard.ManagedOpen, ""), standard.ManagedClose, "")
+	if err := os.WriteFile(filepath.Join(dir, "AGENTS.md"), []byte(stripped), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	var out, errb bytes.Buffer
+	err = run([]string{"check", dir}, &out, &errb)
+	if code := exitCodeOf(t, err); code != exitDrift {
+		t.Fatalf("a hub with no managed region should drift, got code %d (%v)", code, err)
+	}
+	if !strings.Contains(out.String(), "managed region") {
+		t.Fatalf("drift should name the missing managed region, got: %s", out.String())
 	}
 }
 

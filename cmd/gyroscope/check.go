@@ -115,40 +115,49 @@ func checkRepo(repoDir string, cfg config.Config) ([]string, error) {
 		}
 	}
 
-	// 3. Hub routes match the enabled spokes: no dangling route to a disabled or
-	// missing spoke, no missing route for an enabled one.
+	// Checks 3 and 7 inspect only gyroscope's managed region of the hub — the
+	// content between the managed markers. Everything outside is the user's and is
+	// invisible to check (ADR 0007), so user-authored sections and their own
+	// route-like bullets never count as drift.
 	if hubPresent {
 		hub, err := os.ReadFile(filepath.Join(repoDir, "AGENTS.md"))
 		if err != nil {
 			return nil, err
 		}
-		if got, ok := routesSection(hub); !ok {
-			problems = append(problems, "AGENTS.md: `## Routes` section not found")
+		region, ok := standard.ManagedRegion(hub)
+		if !ok {
+			// A hub with no well-formed managed region is not in the managed-block
+			// form gyroscope now writes — the whole route/directive comparison is
+			// moot, so report it once and skip the region-scoped checks.
+			problems = append(problems, "AGENTS.md: managed region not found (run `gyroscope init --apply` to migrate to the managed-block form)")
 		} else {
-			want := standard.Routes(cfg)
-			gotSet := lineSet(got)
-			wantSet := lineSet(want)
-			for _, l := range nonBlankLines(got) {
-				if _, ok := wantSet[l]; !ok {
-					problems = append(problems, "AGENTS.md: dangling route (spoke disabled or absent): "+l)
+			// 3. Hub routes match the enabled spokes: no dangling route to a disabled
+			// or missing spoke, no missing route for an enabled one.
+			if got, ok := routesSection(region); !ok {
+				problems = append(problems, "AGENTS.md: `## Routes` section not found in the managed region")
+			} else {
+				want := standard.Routes(cfg)
+				gotSet := lineSet(got)
+				wantSet := lineSet(want)
+				for _, l := range nonBlankLines(got) {
+					if _, ok := wantSet[l]; !ok {
+						problems = append(problems, "AGENTS.md: dangling route (spoke disabled or absent): "+l)
+					}
+				}
+				for _, l := range nonBlankLines(want) {
+					if _, ok := gotSet[l]; !ok {
+						problems = append(problems, "AGENTS.md: missing route for an enabled spoke: "+l)
+					}
 				}
 			}
-			for _, l := range nonBlankLines(want) {
-				if _, ok := gotSet[l]; !ok {
-					problems = append(problems, "AGENTS.md: missing route for an enabled spoke: "+l)
-				}
-			}
-		}
-	}
 
-	// 7. When personas are enabled, the hub carries the standing personas directive.
-	if hubPresent && cfg.Spokes.Personas.Enabled() {
-		hub, err := os.ReadFile(filepath.Join(repoDir, "AGENTS.md"))
-		if err != nil {
-			return nil, err
-		}
-		if !strings.Contains(string(hub), standard.PersonasDirective(cfg)) {
-			problems = append(problems, "AGENTS.md: personas directive missing or altered (run `gyroscope init`)")
+			// 7. When personas are enabled, the managed region carries the standing
+			// personas directive.
+			if cfg.Spokes.Personas.Enabled() {
+				if !strings.Contains(string(region), standard.PersonasDirective(cfg)) {
+					problems = append(problems, "AGENTS.md: personas directive missing or altered (run `gyroscope init`)")
+				}
+			}
 		}
 	}
 
