@@ -65,6 +65,7 @@ func run(args []string, stdout, stderr io.Writer) error {
 	root.AddCommand(newCheckCmd(stdout))
 	root.AddCommand(newVersionCmd(stdout))
 	root.AddCommand(newInstallSkillCmd(stdout))
+	root.AddCommand(newAgentsCmd(stdout))
 	root.SetArgs(args)
 	if err := root.Execute(); err != nil {
 		// Cobra usage errors (bad flags/args, unknown command) come back unwrapped;
