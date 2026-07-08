@@ -149,26 +149,32 @@ func TestInitInjectsStateFilesInHookAndWritesThem(t *testing.T) {
 	}
 }
 
-func TestInitApplyIsAllOrNothing(t *testing.T) {
+// A single colliding pointer no longer aborts the whole run (that was the old
+// all-or-nothing behavior). init --apply writes the safe subset around it and
+// leaves only the conflicting file untouched — the conflict surfaces as drift.
+func TestInitApplyWritesSafeSubsetAroundAConflict(t *testing.T) {
 	dir := t.TempDir()
-	// Pre-existing file that collides with one of the pointers (not the first standard file),
-	// to prove NOTHING is written when any target collides.
+	// Pre-existing file that collides with one of the pointers, to prove the rest
+	// of the standard still lands and only this file is skipped.
 	if err := os.WriteFile(filepath.Join(dir, "GEMINI.md"), []byte("mine"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	var out, errb bytes.Buffer
 	if err := run([]string{"init", dir, "--apply"}, &out, &errb); err == nil {
-		t.Fatal("expected refusal when a target already exists")
+		t.Fatal("a remaining conflict should surface as drift (exit 1)")
 	}
-	// Nothing else should have been written — AGENTS.md / CLAUDE.md / .claude must be absent.
+	// The safe subset lands regardless of the collision.
 	for _, p := range []string{"AGENTS.md", "CLAUDE.md", ".claude/settings.json"} {
-		if _, err := os.Stat(filepath.Join(dir, p)); !os.IsNotExist(err) {
-			t.Errorf("all-or-nothing violated: %s exists", p)
+		if _, err := os.Stat(filepath.Join(dir, p)); err != nil {
+			t.Errorf("safe subset should land despite a conflict: %s missing (%v)", p, err)
 		}
 	}
-	// The pre-existing file is untouched.
+	// The conflicting file is untouched, and reported skipped.
 	if b, _ := os.ReadFile(filepath.Join(dir, "GEMINI.md")); string(b) != "mine" {
-		t.Fatal("existing file must be untouched")
+		t.Fatal("existing conflicting file must be untouched")
+	}
+	if !strings.Contains(out.String(), "GEMINI.md") {
+		t.Fatalf("the skipped conflict should be reported, got:\n%s", out.String())
 	}
 }
 
@@ -277,24 +283,61 @@ func TestInitApplyMergesMarkerlessHub(t *testing.T) {
 	}
 }
 
+// Regression (defect 2): with a CONFLICT present, init --apply (no --force) must
+// apply the NEW + MERGE subset and SKIP only the conflict — not refuse the whole
+// run. D3's spec: "Only a true CONFLICT needs --force."
+func TestInitApplySkipsConflictsAndWritesTheSafeSubset(t *testing.T) {
+	dir := t.TempDir()
+	// One CONFLICT (a foreign pointer with its own content, no managed region).
+	if err := os.WriteFile(filepath.Join(dir, "CLAUDE.md"), []byte("my own claude notes\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	var out, errb bytes.Buffer
+	err := run([]string{"init", dir, "--apply"}, &out, &errb)
+	// The safe subset landing while a conflict remains is drift (exit 1), not a
+	// can't-run: the repo is not yet fully conformant, --force is still needed.
+	if err == nil {
+		t.Fatal("a remaining conflict should surface as drift (exit 1), got success")
+	}
+	if code := exitCodeOf(t, err); code != exitDrift {
+		t.Fatalf("skipped conflict should exit %d (drift), got %d: %v", exitDrift, code, err)
+	}
+	// The NEW files landed even though CLAUDE.md conflicts.
+	for _, p := range []string{"CONTEXT.md", "GEMINI.md", ".cursorrules", "docs/agents.md", "TODO.md"} {
+		if _, err := os.Stat(filepath.Join(dir, p)); err != nil {
+			t.Errorf("NEW file %s should have landed alongside a skipped conflict: %v", p, err)
+		}
+	}
+	// The conflicting file is untouched.
+	if b, _ := os.ReadFile(filepath.Join(dir, "CLAUDE.md")); string(b) != "my own claude notes\n" {
+		t.Fatal("the conflicting file must be left untouched")
+	}
+	// The skip is reported clearly, naming the file and pointing at --force.
+	s := out.String()
+	if !strings.Contains(s, "skipped") || !strings.Contains(s, "--force") || !strings.Contains(s, "CLAUDE.md") {
+		t.Fatalf("apply should report the skipped conflict (use --force): CLAUDE.md, got:\n%s", s)
+	}
+}
+
 func TestInitApplyRefusesConflictWithoutForce(t *testing.T) {
 	dir := t.TempDir()
 	// A foreign pointer file with no managed region is a CONFLICT: init --apply
-	// must refuse without --force and write nothing (all-or-nothing on conflict).
+	// skips it (writing the safe subset) but leaves it untouched, and surfaces the
+	// remaining conflict as drift.
 	if err := os.WriteFile(filepath.Join(dir, "CLAUDE.md"), []byte("my own claude notes\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	var out, errb bytes.Buffer
 	err := run([]string{"init", dir, "--apply"}, &out, &errb)
 	if err == nil {
-		t.Fatal("a CONFLICT must refuse without --force")
+		t.Fatal("a CONFLICT should surface as drift without --force")
 	}
-	if !strings.Contains(err.Error(), "CLAUDE.md") {
-		t.Fatalf("refusal should name the conflicting file, got: %v", err)
+	if !strings.Contains(out.String(), "CLAUDE.md") {
+		t.Fatalf("the skip report should name the conflicting file, got:\n%s", out.String())
 	}
-	// Nothing else written.
-	if _, err := os.Stat(filepath.Join(dir, "AGENTS.md")); !os.IsNotExist(err) {
-		t.Fatal("conflict refusal must be all-or-nothing: AGENTS.md must not be written")
+	// The safe subset still lands (no longer all-or-nothing): the hub is written.
+	if _, err := os.Stat(filepath.Join(dir, "AGENTS.md")); err != nil {
+		t.Fatalf("the safe subset should land while a conflict is skipped: %v", err)
 	}
 	// User's file untouched.
 	if b, _ := os.ReadFile(filepath.Join(dir, "CLAUDE.md")); string(b) != "my own claude notes\n" {

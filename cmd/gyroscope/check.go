@@ -60,7 +60,10 @@ func newCheckCmd(stdout io.Writer) *cobra.Command {
 				items := classify(abs, files)
 				adapters := enabledAdapters(cfg)
 				paths := hookPathsFor(cfg)
-				if err := applyConverge(stdout, abs, items, adapters, paths, false, true); err != nil {
+				// force=false: create NEW files, merge the hub's managed region, and
+				// leave conflicts untouched (they surface as drift in the re-check
+				// below). --fix never clobbers user content.
+				if _, err := applyConverge(stdout, abs, items, adapters, paths, false); err != nil {
 					return err
 				}
 			}

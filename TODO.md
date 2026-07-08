@@ -127,8 +127,12 @@
   — `applyConverge` drives writes per classified item (shared by init and D4's
   fix); `standard.InjectManaged` is the atomic temp+rename managed merge (the one
   deliberate WriteGuarded exception, justified in a comment). init is now
-  idempotent; re-apply on a current repo writes nothing; conflicts refuse
-  all-or-nothing without `--force`. Commit `35cfe88`.
+  idempotent; re-apply on a current repo writes nothing. Commit `35cfe88`.
+  Follow-up (mixed repo): `--apply` (no `--force`) is no longer all-or-nothing — it
+  now writes every NEW + MERGE item and SKIPS only the CONFLICTs, printing
+  `N conflict(s) skipped (use --force): …` and exiting drift (1) so the remaining
+  conflict is visible (0 when fully converged). `--force` still overwrites. Verified
+  against notwhoop: the NEW spokes land even though CLAUDE.md conflicts.
 - [x] **D4 `check --fix` (or `init --fix`).** Auto-apply the safe convergence so
   `check` (detect) and fix (converge) are symmetric. CI runs `check`; dev runs
   `--fix`. — `check --fix` runs the shared `applyConverge` in skip-conflicts mode

@@ -65,8 +65,16 @@ func newInitCmd(stdout io.Writer) *cobra.Command {
 				return nil
 			}
 
-			if err := applyConverge(stdout, abs, items, adapters, paths, force, false); err != nil {
+			skipped, err := applyConverge(stdout, abs, items, adapters, paths, force)
+			if err != nil {
 				return err
+			}
+			// The safe subset landed. If any CONFLICT was skipped, the repo is not
+			// yet fully conformant — report drift (exit 1) so a caller/CI can see
+			// that --force is still needed, mirroring `check`'s drift signal. A clean
+			// full convergence exits 0.
+			if len(skipped) > 0 {
+				return errDrift(fmt.Errorf("%d conflict(s) need --force: %s", len(skipped), strings.Join(skipped, ", ")))
 			}
 			return nil
 		},

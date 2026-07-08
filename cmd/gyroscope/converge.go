@@ -135,25 +135,20 @@ func conflicts(items []convergeItem) []string {
 
 // applyConverge writes the safe convergence for the classified items and installs
 // the enforcement adapters. It is merge-safe (D3): NEW files are created, a hub's
-// managed region is injected in place (MERGE), and OK files are skipped.
+// managed region is injected in place (MERGE), and OK files are skipped. It NEVER
+// refuses all-or-nothing — a single conflict no longer blocks the safe subset.
 //
-// CONFLICT handling depends on mode:
-//   - init --apply (force=false): refuses all-or-nothing when any conflict exists.
-//   - init --apply --force: overwrites conflicts.
-//   - check --fix (skipConflicts=true): applies the safe subset and leaves
-//     conflicts untouched (never clobbers user content); the caller reports the
-//     remaining conflict as drift.
+// CONFLICT handling depends on force:
+//   - force=false (init --apply, check --fix): the safe subset lands and each
+//     CONFLICT is left untouched (never clobbering user content) and reported. The
+//     names of the skipped conflicts are returned so the caller can signal that the
+//     repo is not yet fully conformant (drift; --force still needed).
+//   - force=true (init --apply --force): CONFLICTs are overwritten; nothing is
+//     skipped, so the returned slice is empty.
 //
-// force and skipConflicts are mutually exclusive knobs (force wins if both set).
 // It is shared by `init --apply` and `check --fix` so detect and converge stay
 // symmetric.
-func applyConverge(stdout io.Writer, abs string, items []convergeItem, adapters []enforce.Adapter, paths []string, force, skipConflicts bool) error {
-	if !force && !skipConflicts {
-		if clashes := conflicts(items); len(clashes) > 0 {
-			return errCannotRun(fmt.Errorf("refusing to overwrite conflicting files (use --force): %s", strings.Join(clashes, ", ")))
-		}
-	}
-
+func applyConverge(stdout io.Writer, abs string, items []convergeItem, adapters []enforce.Adapter, paths []string, force bool) (skipped []string, err error) {
 	wroteLocal := false
 	for _, it := range items {
 		switch it.State {
@@ -163,23 +158,23 @@ func applyConverge(stdout io.Writer, abs string, items []convergeItem, adapters 
 		case stateMerge:
 			// In-place managed-region injection (the hub). Atomic temp+rename.
 			if err := standard.InjectManaged(abs, it.Want); err != nil {
-				return errCannotRun(err)
+				return nil, errCannotRun(err)
 			}
 			fmt.Fprintf(stdout, "merged %s (managed region)\n", it.Dest)
 		case stateNew:
 			if err := fsutil.WriteGuarded(abs, it.Dest, it.Want, false); err != nil {
-				return errCannotRun(err)
+				return nil, errCannotRun(err)
 			}
 			fmt.Fprintf(stdout, "wrote %s\n", it.Dest)
 		case stateConflict:
-			if skipConflicts {
-				// --fix never clobbers user content; the conflict stays and is
-				// reported as drift by the caller (needs --force to resolve).
+			if !force {
+				// Never clobber user content without --force: skip and record so the
+				// caller can report the remaining conflict as drift.
+				skipped = append(skipped, it.Dest)
 				continue
 			}
-			// Only reached with force (the guard above refused otherwise).
 			if err := fsutil.WriteGuarded(abs, it.Dest, it.Want, true); err != nil {
-				return errCannotRun(err)
+				return nil, errCannotRun(err)
 			}
 			fmt.Fprintf(stdout, "overwrote %s (--force)\n", it.Dest)
 		}
@@ -189,14 +184,14 @@ func applyConverge(stdout io.Writer, abs string, items []convergeItem, adapters 
 	}
 	if wroteLocal {
 		if err := standard.EnsureLocalGitignore(abs); err != nil {
-			return errCannotRun(err)
+			return nil, errCannotRun(err)
 		}
 	}
 
 	for _, a := range adapters {
 		changed, err := a.Apply(abs, paths)
 		if err != nil {
-			return errCannotRun(err)
+			return nil, errCannotRun(err)
 		}
 		if changed {
 			fmt.Fprintf(stdout, "installed enforcement (%s): %s\n", a.ID(), a.PlanLine(paths))
@@ -204,5 +199,9 @@ func applyConverge(stdout io.Writer, abs string, items []convergeItem, adapters 
 			fmt.Fprintf(stdout, "enforcement (%s) already present\n", a.ID())
 		}
 	}
-	return nil
+
+	if len(skipped) > 0 {
+		fmt.Fprintf(stdout, "%d conflict(s) skipped (use --force): %s\n", len(skipped), strings.Join(skipped, ", "))
+	}
+	return skipped, nil
 }
