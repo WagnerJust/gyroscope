@@ -164,6 +164,41 @@
   keep-vs-adopt, hub route dedup) → fill from existing docs → `check --fix` to green.
   Closes the gap the notwhoop live test exposed (SKILL.md was fresh-scaffold-only).
 
+## TODO/DONE split — lean injected state (2026-07-09)
+> Problem (notwhoop dogfood): the SessionStart hook cats the WHOLE state file every
+> session, so a large TODO.md = large injection cost every session — and the agent-
+> invented "lean root + detailed docs" split relied on discipline agents ignore
+> (observed: they use the injected root one like normal). Fix with a mechanical
+> status boundary: TODO.md = open work (injected), DONE.md = completed archive
+> (enforced + routed, NOT injected). Whole-file `cat` makes a second file a cleaner
+> boundary than an in-file marker. Config: fold DONE.md under the existing `state`
+> toggle (TODO + DONE + .local/todo are one unit — no new key). Rationale:
+> conversation 2026-07-09. Needs an ADR.
+
+- [ ] **E1 `DONE.md` scaffold + route-only spoke.** New `templates/DONE.md` (archive
+  header: "completed work; NOT injected; move `[x]` items here from TODO.md"). Add to
+  `standard.Plan` under the `State` toggle (`standard.go:38`). Add a hub route under
+  State in `standard.Routes` (`standard.go:135`) — "completed work / history →
+  `DONE.md`". Do NOT add DONE.md to `hookPathsFor` (`init.go`) — enforced + routed,
+  never injected. TDD.
+- [ ] **E2 TODO.md = open-work-only + the move rule.** Update `templates/TODO.md`
+  header: open work only; "when a task is done, move its line to DONE.md — this file
+  is injected every session, keep it small." Mirror one convention line in
+  `templates/docs/agents.md`. Adjust the State route wording if needed.
+- [ ] **E3 `check` archive nudge (the enforcement half).** Heuristic in `gyroscope
+  check`: flag when TODO.md carries more than N completed `[x]` items (or exceeds a
+  size threshold) → "archive done items to DONE.md". Turns the move-convention into a
+  check with teeth. Decide drift-vs-soft-note and the threshold; document both. TDD.
+- [ ] **E4 SKILL.md reconciliation + adoption.** Extend the "reconcile, don't clobber"
+  flow: on adoption, move existing `[x]` items to DONE.md and consolidate any
+  stray/non-root TODO (e.g. `docs/TODO.md`) into root TODO.md — fixes the notwhoop
+  two-todo mess in the same pass.
+- [ ] **E5 ADR + docs + dogfood.** ADR 0009 (TODO/DONE split: mechanical status
+  boundary beats the failed lean/detailed convention; DONE.md enforced + routed but
+  not injected). Update CONTEXT.md's Spoke term to include DONE.md. Dogfood: split
+  gyroscope's own TODO.md — move every `[x]` block to DONE.md, leave open items — and
+  confirm `./bin/gyroscope check .` stays conformant.
+
 ## Later — deferred (explicitly out of MVP)
 - [ ] **Zed enforcement adapter** — active `enforce.Adapter` for Zed (the passive `.rules` doc-target pointer already exists; this is the force-inject side, parallel to Claude's SessionStart hook / PI's `session_start` extension). Investigate Zed's injection mechanism (does its agent support a session-start hook / rule that force-reads the hub, or is `.rules` native-read only?). If native-read only, there may be nothing to enforce — document that outcome. Wire behind the `enforce` config section (`zed`, opt-in) if a mechanism exists.
 - [ ] **Cursor enforcement adapter** — active `enforce.Adapter` for Cursor (passive `.cursorrules` pointer already exists). Investigate Cursor's mechanism: `.cursor/rules/*.mdc` with `alwaysApply: true` (always-injected project rules) and/or Cursor hooks. An always-applied rule that force-reads the hub would be the enforcement analog. Wire behind the `enforce` config section (`cursor`, opt-in).
