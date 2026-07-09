@@ -175,13 +175,13 @@
 > toggle (TODO + DONE + .local/todo are one unit — no new key). Rationale:
 > conversation 2026-07-09. Needs an ADR.
 
-- [x] **E1 `DONE.md` scaffold + route-only spoke** (5117285). New `templates/DONE.md` (archive
+- [x] **E1 `DONE.md` scaffold + route-only spoke** (3f44dcb). New `templates/DONE.md` (archive
   header: "completed work; NOT injected; move `[x]` items here from TODO.md"). Add to
   `standard.Plan` under the `State` toggle (`standard.go:38`). Add a hub route under
   State in `standard.Routes` (`standard.go:135`) — "completed work / history →
   `DONE.md`". Do NOT add DONE.md to `hookPathsFor` (`init.go`) — enforced + routed,
   never injected. TDD.
-- [ ] **E2 TODO.md = open-work-only + the move rule.** Update `templates/TODO.md`
+- [x] **E2 TODO.md = open-work-only + the move rule** (91cc090). Update `templates/TODO.md`
   header: open work only; "when a task is done, move its line to DONE.md — this file
   is injected every session, keep it small." Mirror one convention line in
   `templates/docs/agents.md`. Adjust the State route wording if needed.

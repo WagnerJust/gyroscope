@@ -11,6 +11,9 @@ Applies to all work in this repo.
 
 - {{Language / framework and the version pin.}}
 - {{Key patterns to follow — with the reason, not just the rule.}}
+- State hygiene: `TODO.md` holds open work only and is injected every session;
+  when a task is done, move its line to `DONE.md` (the archive is routed, not
+  injected) so the per-session context stays small.
 
 ## Do NOT
 
