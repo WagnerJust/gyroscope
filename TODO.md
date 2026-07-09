@@ -175,7 +175,7 @@
 > toggle (TODO + DONE + .local/todo are one unit — no new key). Rationale:
 > conversation 2026-07-09. Needs an ADR.
 
-- [ ] **E1 `DONE.md` scaffold + route-only spoke.** New `templates/DONE.md` (archive
+- [x] **E1 `DONE.md` scaffold + route-only spoke** (5117285). New `templates/DONE.md` (archive
   header: "completed work; NOT injected; move `[x]` items here from TODO.md"). Add to
   `standard.Plan` under the `State` toggle (`standard.go:38`). Add a hub route under
   State in `standard.Routes` (`standard.go:135`) — "completed work / history →

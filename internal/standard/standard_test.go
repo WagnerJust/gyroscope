@@ -195,9 +195,29 @@ func TestPlanDropsDisabledState(t *testing.T) {
 	cfg.Spokes.State = false
 	files, _ := Plan(cfg)
 	for _, f := range files {
-		if f.Dest == "TODO.md" || f.Dest == ".local/todo.md" {
+		if f.Dest == "TODO.md" || f.Dest == ".local/todo.md" || f.Dest == "DONE.md" {
 			t.Fatalf("disabled state spoke should be dropped: %s", f.Dest)
 		}
+	}
+}
+
+func TestPlanIncludesDoneWhenStateOn(t *testing.T) {
+	files, err := Plan(config.Default())
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := map[string]bool{}
+	for _, f := range files {
+		got[f.Dest] = true
+	}
+	// DONE.md rides under the same State toggle as TODO.md — the completed
+	// archive is enforced + routed but never injected (see ADR 0009).
+	if !got["DONE.md"] {
+		t.Fatal("default plan should include the DONE.md archive under the state spoke")
+	}
+	agents := agentsContent(t, files)
+	if !strings.Contains(agents, "DONE.md") {
+		t.Fatalf("hub should route to DONE.md, got:\n%s", agents)
 	}
 }
 

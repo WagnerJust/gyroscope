@@ -393,6 +393,15 @@ func TestInitSkipsPIExtensionByDefault(t *testing.T) {
 	}
 }
 
+// DONE.md is enforced (Plan/check) and hub-routed, but must NEVER be catted by
+// the SessionStart hook — the whole point of the TODO/DONE split is to keep the
+// completed archive out of the per-session injection (ADR 0009).
+func TestHookPathsNeverCatsDone(t *testing.T) {
+	if contains(hookPathsFor(config.Default()), "DONE.md") {
+		t.Fatal("hook must never cat DONE.md — the archive is routed, not injected")
+	}
+}
+
 func TestHookPathsCatGyroscopeJSONWhenPersonasEnabled(t *testing.T) {
 	cfg := config.Default() // personas unknown → enabled
 	got := hookPathsFor(cfg)

@@ -36,6 +36,9 @@ func Plan(cfg config.Config) ([]File, error) {
 		{cfg.Spokes.Personas.Enabled(), "templates/docs/agents/README.md", "docs/agents/README.md"},
 		{cfg.Spokes.Contributing, "templates/CONTRIBUTING.md", "CONTRIBUTING.md"},
 		{cfg.Spokes.State, "templates/TODO.md", "TODO.md"},
+		// DONE.md is the completed-work archive — enforced + hub-routed under the
+		// same State toggle as TODO.md, but never catted by the hook (see ADR 0009).
+		{cfg.Spokes.State, "templates/DONE.md", "DONE.md"},
 		{cfg.Spokes.State, "templates/local-todo.md", ".local/todo.md"},
 		{cfg.Spokes.Local, "templates/local.md", ".local/local.md"},
 		// Process artifacts (enforcement genre — Git/GitHub apply them; not hub-routed).
@@ -132,7 +135,8 @@ func routeLines(cfg config.Config) []string {
 	}{
 		{cfg.Spokes.Context, "- **Naming things / writing prose** → read `CONTEXT.md` first for the canonical vocabulary."},
 		{cfg.Spokes.Agents, "- **Build, test, conventions** → `docs/agents.md`."},
-		{cfg.Spokes.State, "- **Where work stands — done / in flight / next (resume here)** → `TODO.md` (repo-wide); `.local/todo.md` holds your personal, gitignored state."},
+		{cfg.Spokes.State, "- **Where work stands — in flight / next (resume here)** → `TODO.md` (repo-wide, open work only); `.local/todo.md` holds your personal, gitignored state."},
+		{cfg.Spokes.State, "- **Completed work / history** → `DONE.md` (archive; not injected — move a task's line here from `TODO.md` when it's done)."},
 		{cfg.Spokes.Contributing, "- **How changes get proposed & reviewed here** → `CONTRIBUTING.md`."},
 		{cfg.Spokes.Local, "- **Your** personal setup / stack (may differ from repo defaults) → `.local/local.md` (gitignored; may not exist)."},
 		{cfg.Spokes.ADR, "- **Why the code is shaped this way** → `docs/adr/` (architecture decisions)."},
