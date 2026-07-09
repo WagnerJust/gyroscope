@@ -34,7 +34,7 @@
 - [x] **E4 SKILL.md reconciliation + adoption** (e526858). Extended the "reconcile, don't
   clobber" flow: on adoption, move existing `[x]` items to DONE.md and consolidate any
   stray/non-root TODO (e.g. `docs/TODO.md`) into root TODO.md — never two todo files.
-- [x] **E5 ADR + docs + dogfood** (de8725a). ADR 0009 (TODO/DONE split: mechanical status
+- [x] **E5 ADR + docs + dogfood** (48a63b6). ADR 0009 (TODO/DONE split: mechanical status
   boundary beats the failed lean/detailed convention; DONE.md enforced + routed but
   not injected). Updated CONTEXT.md's Spoke + SessionStart-hook terms to include DONE.md.
   Dogfooded: split gyroscope's own TODO.md — moved every completed `[x]` block to DONE.md,
