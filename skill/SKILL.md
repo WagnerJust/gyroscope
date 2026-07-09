@@ -120,6 +120,14 @@ Converge instead:
      block, or leave them under a separate heading OUTSIDE the
      `<!-- gyroscope:managed -->` markers — content outside the markers is the user's
      and is invisible to `check`. Remove the duplication either way.
+   - **Existing TODO state → split into `TODO.md` + `DONE.md`:** `TODO.md` is catted
+     into every session, so it must stay lean. Move every completed `[x]` item out of
+     the repo's TODO into `DONE.md` (the routed-but-not-injected archive), leaving only
+     open `[ ]`/`[~]` work in `TODO.md`. If the repo has a stray or non-root todo (e.g.
+     a `docs/TODO.md`, or an agent-invented "lean root + detailed" second file),
+     consolidate it into the root `TODO.md` in the same pass — **never leave two todo
+     files.** This mechanical status boundary replaces any prior lean/detailed
+     convention (see ADR 0009).
 5. **Fill placeholders from what already exists.** On an established repo, prefer the
    repo's own docs/READMEs over interviewing from scratch — pull the one-liner,
    domain terms, and build/test commands from what's there, and only ask the user

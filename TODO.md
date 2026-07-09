@@ -185,11 +185,11 @@
   header: open work only; "when a task is done, move its line to DONE.md — this file
   is injected every session, keep it small." Mirror one convention line in
   `templates/docs/agents.md`. Adjust the State route wording if needed.
-- [x] **E3 `check` archive nudge (the enforcement half)** (81b42e4; threshold >5 `[x]`, soft note / exit 0). Heuristic in `gyroscope
+- [x] **E3 `check` archive nudge (the enforcement half)** (f9a0113; threshold >5 `[x]`, soft note / exit 0). Heuristic in `gyroscope
   check`: flag when TODO.md carries more than N completed `[x]` items (or exceeds a
   size threshold) → "archive done items to DONE.md". Turns the move-convention into a
   check with teeth. Decide drift-vs-soft-note and the threshold; document both. TDD.
-- [ ] **E4 SKILL.md reconciliation + adoption.** Extend the "reconcile, don't clobber"
+- [x] **E4 SKILL.md reconciliation + adoption** (PENDING). Extend the "reconcile, don't clobber"
   flow: on adoption, move existing `[x]` items to DONE.md and consolidate any
   stray/non-root TODO (e.g. `docs/TODO.md`) into root TODO.md — fixes the notwhoop
   two-todo mess in the same pass.
