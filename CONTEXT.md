@@ -31,9 +31,11 @@ the same region; pick "managed region." Not the whole hub (only the delimited sl
 
 ### Spoke
 One of the topic docs the hub routes to — `CONTEXT.md`, `docs/agents.md`,
-`CONTRIBUTING.md`, `docs/adr/`, `docs/agents/`, `TODO.md`, `.local/local.md`. Each
-is optional and toggled in `gyroscope.json` (which also prunes its hub route when
-off); the hub itself is always written.
+`CONTRIBUTING.md`, `docs/adr/`, `docs/agents/`, `TODO.md`, `DONE.md`,
+`.local/local.md`. Each is optional and toggled in `gyroscope.json` (which also
+prunes its hub route when off); the hub itself is always written. `TODO.md`
+(open work) and `DONE.md` (completed archive) both belong to the `state` toggle,
+but `DONE.md` is routed only — never injected by the hook (see ADR 0009).
 _Avoid:_ pointer file (a spoke carries content; a pointer only redirects); process artifact (written but not routed).
 
 ### Process artifact
@@ -66,7 +68,9 @@ _Avoid:_ doc target (far more tools, pointer-only, no enforcement).
 The Claude adapter's mechanism: a `.claude/settings.json` entry that `cat`s the
 hub + `docs/agents.md` + the state files (`TODO.md`, `.local/todo.md`) +
 `.local/local.md` into context at the start of each session, so the rules and
-current progress are present without the agent choosing to open them.
+current progress are present without the agent choosing to open them. `DONE.md`
+is a spoke and is routed by the hub, but is deliberately excluded from the
+cat-set — the injected files are a subset of the routed ones (see ADR 0009).
 _Avoid:_ pointer file (a hook enforces; a pointer only redirects).
 
 ### Scaffold
