@@ -181,11 +181,11 @@
   State in `standard.Routes` (`standard.go:135`) — "completed work / history →
   `DONE.md`". Do NOT add DONE.md to `hookPathsFor` (`init.go`) — enforced + routed,
   never injected. TDD.
-- [x] **E2 TODO.md = open-work-only + the move rule** (91cc090). Update `templates/TODO.md`
+- [x] **E2 TODO.md = open-work-only + the move rule** (9174690). Update `templates/TODO.md`
   header: open work only; "when a task is done, move its line to DONE.md — this file
   is injected every session, keep it small." Mirror one convention line in
   `templates/docs/agents.md`. Adjust the State route wording if needed.
-- [ ] **E3 `check` archive nudge (the enforcement half).** Heuristic in `gyroscope
+- [x] **E3 `check` archive nudge (the enforcement half)** (81b42e4; threshold >5 `[x]`, soft note / exit 0). Heuristic in `gyroscope
   check`: flag when TODO.md carries more than N completed `[x]` items (or exceeds a
   size threshold) → "archive done items to DONE.md". Turns the move-convention into a
   check with teeth. Decide drift-vs-soft-note and the threshold; document both. TDD.

@@ -128,6 +128,55 @@ func TestCheckFailsOnUnfilledPlaceholder(t *testing.T) {
 	}
 }
 
+// setTODO overwrites the repo's TODO.md, keeping the rest of the filled repo
+// conformant so a test isolates the archive-nudge heuristic.
+func setTODO(t *testing.T, dir, body string) {
+	t.Helper()
+	if err := os.WriteFile(filepath.Join(dir, "TODO.md"), []byte(body), 0o644); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// The archive nudge is a SOFT note, not drift: an unarchived done item is untidy
+// but not a structural nonconformance, so a repo over the threshold still exits 0
+// (conformant) while printing the nudge. Over-threshold branch.
+func TestCheckArchiveNudgeOverThresholdIsSoftNote(t *testing.T) {
+	dir := initAndFill(t)
+	// 6 completed items in TODO.md — over the threshold of 5.
+	setTODO(t, dir, "# TODO\n\n## Now\n- [ ] open one\n\n## Done\n"+
+		"- [x] a\n- [x] b\n- [x] c\n- [x] d\n- [x] e\n- [x] f\n")
+	var out, errb bytes.Buffer
+	if err := run([]string{"check", dir}, &out, &errb); err != nil {
+		t.Fatalf("archive nudge must stay a soft note (exit 0), got %v\n%s", err, out.String())
+	}
+	s := out.String()
+	if !strings.Contains(s, "conformant") {
+		t.Fatalf("over-threshold repo should still be conformant, got: %s", s)
+	}
+	if !strings.Contains(s, "DONE.md") || !strings.Contains(strings.ToLower(s), "archive") {
+		t.Fatalf("expected an archive-to-DONE.md nudge, got: %s", s)
+	}
+}
+
+// Under-threshold branch: a small number of completed items in TODO.md draws no
+// nudge (and stays conformant).
+func TestCheckArchiveNudgeUnderThresholdIsSilent(t *testing.T) {
+	dir := initAndFill(t)
+	// 2 completed items — under the threshold.
+	setTODO(t, dir, "# TODO\n\n## Now\n- [ ] open one\n- [x] a\n- [x] b\n")
+	var out, errb bytes.Buffer
+	if err := run([]string{"check", dir}, &out, &errb); err != nil {
+		t.Fatalf("check should pass, got %v\n%s", err, out.String())
+	}
+	s := out.String()
+	if !strings.Contains(s, "conformant") {
+		t.Fatalf("under-threshold repo should be conformant, got: %s", s)
+	}
+	if strings.Contains(s, "archive") || strings.Contains(s, "DONE.md") {
+		t.Fatalf("under-threshold repo must draw no archive nudge, got: %s", s)
+	}
+}
+
 // initAndFillPI is initAndFill with PI enforcement enabled.
 func initAndFillPI(t *testing.T) string {
 	t.Helper()

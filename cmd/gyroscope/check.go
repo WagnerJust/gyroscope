@@ -68,9 +68,14 @@ func newCheckCmd(stdout io.Writer) *cobra.Command {
 				}
 			}
 
-			problems, err := checkRepo(abs, cfg)
+			problems, notes, err := checkRepo(abs, cfg)
 			if err != nil {
 				return errCannotRun(err)
+			}
+			// Soft notes (e.g. the archive nudge) print regardless of drift but never
+			// affect the exit code — they are housekeeping advice, not nonconformance.
+			for _, n := range notes {
+				fmt.Fprintln(stdout, n)
 			}
 			if len(problems) == 0 {
 				fmt.Fprintf(stdout, "conformant: %s\n", abs)
@@ -87,16 +92,24 @@ func newCheckCmd(stdout io.Writer) *cobra.Command {
 	return cmd
 }
 
+// archiveNudgeThreshold is the count of completed `[x]` items in TODO.md above
+// which check emits the archive nudge. TODO.md is catted into every session, so a
+// pile of done items is dead weight in the per-session context; past this many the
+// heuristic tells the user to move them to DONE.md. A handful is tolerated (the
+// legend line and an in-flight item's just-finished sub-tasks), so the bar is
+// deliberately generous rather than zero.
+const archiveNudgeThreshold = 5
+
 // checkRepo verifies that repoDir still matches the standard gyroscope would write
-// for cfg, returning one human-readable line per nonconformance and writing
-// nothing. A non-nil error means the repo could not be inspected (I/O, malformed
-// settings) — a can't-run condition distinct from drift.
+// for cfg. It returns one human-readable line per nonconformance (problems), plus
+// soft notes — advice that prints but never affects the exit code (the archive
+// nudge). Writing nothing. A non-nil error means the repo could not be inspected
+// (I/O, malformed settings) — a can't-run condition distinct from drift.
 //
 // It is the read-only inverse of init: it reuses standard.Plan, standard.Routes,
 // target.All/target.RoutingLine, hookPathsFor and enforce.SessionStartCommand
 // rather than re-deriving any of them.
-func checkRepo(repoDir string, cfg config.Config) ([]string, error) {
-	var problems []string
+func checkRepo(repoDir string, cfg config.Config) (problems, notes []string, err error) {
 	exists := func(rel string) bool {
 		_, err := os.Stat(filepath.Join(repoDir, rel))
 		return err == nil
@@ -112,7 +125,7 @@ func checkRepo(repoDir string, cfg config.Config) ([]string, error) {
 	// been filled.
 	files, err := standard.Plan(cfg)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	for _, f := range files {
 		if !exists(f.Dest) {
@@ -133,7 +146,7 @@ func checkRepo(repoDir string, cfg config.Config) ([]string, error) {
 		if bytes.Contains(f.Content, []byte("{{")) {
 			b, err := os.ReadFile(filepath.Join(repoDir, f.Dest))
 			if err != nil {
-				return nil, err
+				return nil, nil, err
 			}
 			if bytes.Contains(b, []byte("{{")) {
 				problems = append(problems, fmt.Sprintf("%s: unfilled `{{...}}` placeholder remains (the /gyroscope skill fills these)", f.Dest))
@@ -148,7 +161,7 @@ func checkRepo(repoDir string, cfg config.Config) ([]string, error) {
 	if hubPresent {
 		hub, err := os.ReadFile(filepath.Join(repoDir, "AGENTS.md"))
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 		region, ok := standard.ManagedRegion(hub)
 		if !ok {
@@ -192,7 +205,7 @@ func checkRepo(repoDir string, cfg config.Config) ([]string, error) {
 	if cfg.Spokes.Personas == config.PersonaOn {
 		entries, err := os.ReadDir(filepath.Join(repoDir, "docs", "agents"))
 		if err != nil && !os.IsNotExist(err) {
-			return nil, err
+			return nil, nil, err
 		}
 		wired := false
 		for _, e := range entries {
@@ -214,7 +227,7 @@ func checkRepo(repoDir string, cfg config.Config) ([]string, error) {
 		}
 		b, err := os.ReadFile(filepath.Join(repoDir, t.Path))
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 		if !strings.Contains(string(b), target.RoutingLine) {
 			problems = append(problems, fmt.Sprintf("%s: pointer file does not contain the canonical routing line", t.Path))
@@ -226,14 +239,36 @@ func checkRepo(repoDir string, cfg config.Config) ([]string, error) {
 	for _, a := range enabledAdapters(cfg) {
 		installed, err := a.Verify(repoDir, paths)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 		if !installed {
 			problems = append(problems, fmt.Sprintf("enforcement adapter %q: not installed or altered (run `gyroscope init`) — %s", a.ID(), a.PlanLine(paths)))
 		}
 	}
 
-	return problems, nil
+	// Archive nudge (soft, never drift): TODO.md is injected every session, so a
+	// pile of completed `[x]` items is dead per-session weight. When the state
+	// spoke is on and TODO.md carries more than the threshold, advise moving them
+	// to DONE.md — the enforcement half of the TODO/DONE move convention (ADR 0009).
+	// It is a note, not a problem, so an otherwise-conformant repo still exits 0;
+	// housekeeping shouldn't break CI.
+	if cfg.Spokes.State {
+		if b, err := os.ReadFile(filepath.Join(repoDir, "TODO.md")); err == nil {
+			done := 0
+			for _, ln := range strings.Split(string(b), "\n") {
+				if strings.HasPrefix(strings.TrimSpace(ln), "- [x]") {
+					done++
+				}
+			}
+			if done > archiveNudgeThreshold {
+				notes = append(notes, fmt.Sprintf(
+					"TODO.md: %d completed `[x]` items (> %d) — archive them to DONE.md to keep the injected file small",
+					done, archiveNudgeThreshold))
+			}
+		}
+	}
+
+	return problems, notes, nil
 }
 
 // routesSection returns the trimmed body of the hub's `## Routes` section — the
