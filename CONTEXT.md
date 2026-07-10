@@ -21,13 +21,16 @@ and holds no topic content of its own.
 _Avoid:_ "index" / "README"; calling it a spoke.
 
 ### Managed region
-The slice of the hub gyroscope owns and re-writes — the content between the
-`<!-- gyroscope:managed -->` and `<!-- /gyroscope -->` markers (the routes, the
-pointer-files list, the personas directive). Everything outside the markers is the
-user's: gyroscope never writes it and `check` never reads it. Injecting or updating
-the region in place (not clobbering the whole file) is a *merge* (see ADR 0007).
+The slice of a file gyroscope owns and re-writes — the content between the
+`<!-- gyroscope:managed -->` and `<!-- /gyroscope -->` markers. The hub's region
+holds the routes, the pointer-files list, and the personas directive (config-
+rendered); a spoke like `CONTRIBUTING.md` may also carry a region for a static
+gyroscope-owned block (the contributor note, see ADR 0012). Everything outside the
+markers is the user's: gyroscope never writes it and `check` never reads it.
+Injecting or updating the region in place (not clobbering the whole file) is a
+*merge* (see ADR 0007).
 _Avoid:_ "managed block" and "managed region" used for different things — they are
-the same region; pick "managed region." Not the whole hub (only the delimited slice).
+the same region; pick "managed region." Not the whole file (only the delimited slice).
 
 ### Spoke
 One of the topic docs the hub routes to — `CONTEXT.md`, `docs/agents.md`,

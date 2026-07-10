@@ -98,28 +98,32 @@ func MergeManaged(doc, want []byte) (merged []byte, ok bool) {
 	return buf.Bytes(), true
 }
 
-// InjectManaged brings the managed region of the hub at repoDir/AGENTS.md current
-// with want (the freshly-rendered hub), preserving all user content outside the
-// markers. It is the in-place merge path — the one deliberate exception to routing
-// every write through fsutil.WriteGuarded: WriteGuarded is whole-file
+// InjectManaged brings the managed region of the file at repoDir/dest current with
+// want (the freshly-rendered file gyroscope would write), preserving all user
+// content outside the markers. Any spoke may carry a managed region, not just the
+// hub — the mechanism is identical: the hub renders routes into its region, while a
+// spoke like CONTRIBUTING.md carries a static gyroscope-owned block.
+//
+// It is the in-place merge path — the one deliberate exception to routing every
+// write through fsutil.WriteGuarded: WriteGuarded is whole-file
 // (O_EXCL-or-truncate) and cannot preserve a slice, so this reads the existing
-// hub, updates only its managed region (swapping an existing one, or appending a
-// wrapped region to a markerless hub — see MergeManaged), and writes the result
+// file, updates only its managed region (swapping an existing one, or appending a
+// wrapped region to a markerless file — see MergeManaged), and writes the result
 // atomically via a sibling temp file + rename so an interrupted merge can never
-// truncate the user's hub — a reader sees the old file or the new one, never a
+// truncate the user's file — a reader sees the old file or the new one, never a
 // partial.
 //
 // It returns an error only when the merge itself is impossible (want carries no
-// managed region — a programmer error, since want is the freshly-rendered hub).
-func InjectManaged(repoDir string, want []byte) error {
-	path := filepath.Join(repoDir, "AGENTS.md")
+// managed region — a programmer error, since want is a rendered managed file).
+func InjectManaged(repoDir, dest string, want []byte) error {
+	path := filepath.Join(repoDir, dest)
 	doc, err := os.ReadFile(path)
 	if err != nil {
 		return err
 	}
 	merged, ok := MergeManaged(doc, want)
 	if !ok {
-		return fmt.Errorf("%s: rendered hub carries no managed region to inject", "AGENTS.md")
+		return fmt.Errorf("%s: rendered file carries no managed region to inject", dest)
 	}
 	tmp := path + ".gyroscope.tmp"
 	if err := os.WriteFile(tmp, merged, 0o644); err != nil {

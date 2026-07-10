@@ -7,6 +7,9 @@
 
 **Legend:** `[ ]` not started · `[~] `in progress · `[x]` done (then move to `DONE.md`)
 
+## Next
+- [ ] **Skill: adopt-reconcile step for pre-existing personas (`skill/SKILL.md` persona flow).** The persona flow is greenfield-only (ask → pick templates → write → mirror); it has no branch for a repo that already has personas. `gyroscope check` is *config-relative* — a `skipped`/`unknown`/`off` state means it never inspects `docs/agents/` and green says nothing about persona files on disk. So adopting into a repo with existing personas (esp. in a `docs/agents/personas/` subdir the root-only mirror can't see) reads as "conformant, nothing to do" when personas are silently unregistered. Add a **first** step to the persona flow: scan `docs/agents/**` for `name:`-bearing files regardless of config state, classify root-canonical (ADR 0010) vs subdir (doc-routed-on-purpose OR mislaid — **ask**, don't assume), reconcile state-vs-disk disagreement, then fall through to wire/skip. **Binary is not touched** — it stays config-relative and deterministic; judgment lives in the skill (the binary/skill split). Motivated by the exodus adopt session; see the doc-routed-persona pattern in `review-checkpoints.md` and ADR 0010.
+
 ## Known non-issues (kept for context; not action items)
 - [ ] (note, not fixed) `go build ./cmd/gyroscope` reports `dev (commit none, built unknown)` — no ldflags; `make build` is the versioned path. Expected, documented as the "quick local binary."
 

@@ -238,3 +238,30 @@
   after `agents set on` + `init --apply` (no --force), `.claude/agents/` holds all 7 personas
   byte-equal to their `docs/agents/` source, README not mirrored; gyroscope self-check stays
   conformant (no personas → no mirror required).
+
+## Archive nudge convergence — `check --fix` archives done items (2026-07-10)
+- [x] **TODO→DONE move mechanized into `check --fix`.** The archive nudge (ADR 0009) fired at
+  check time to whoever ran check — usually the human — never reaching the mid-session agent
+  that finished a task, so the "move done items" rule needed manual reminding despite being
+  stated 3×. Now `check --fix` moves completed *top-level* `[x]` items (with their indented
+  sub-trees) out of the injected `TODO.md` into `DONE.md`'s `## Completed` section (newest on
+  top), converging the only check finding `--fix` previously couldn't fix. New pure
+  `internal/archive` package (`Plan`/`Merge`); new `fsutil.WriteAtomic` (temp+rename overwrite,
+  the second deliberate non-`WriteGuarded` write after the persona mirror), DONE-written-first
+  so a partial failure duplicates rather than loses work. Gated on `--fix` + the `state` spoke;
+  no-op when nothing is done. ADR 0011. Rejected a 4th prose line, a Stop-hook nag, and an
+  auto-mutating SessionStart hook (see ADR 0011 for why). Template `TODO.md` header updated to
+  point at the mechanized path.
+
+## Contributor-facing, tool-optional docs (2026-07-10)
+- [x] **gyroscope-maintained repos are first-class for devs without gyroscope.** Generalized the
+  managed-region mechanism from hub-only to any spoke: `standard.InjectManaged` takes a `dest`,
+  converge's classifier keys the MERGE path on "want has a managed region" (not `dest ==
+  "AGENTS.md"`), and `check` byte-verifies each non-hub managed spoke (hub stays semantically
+  checked — its region is config-rendered). Added a managed **contributor block to
+  `CONTRIBUTING.md`** ("you don't need gyroscope installed; what the markers/`gyroscope.json`/
+  `.local/` mean; hand-edits reconcile on the next `check --fix`; optional zero-install `go run
+  …@latest check .`") plus a one-line agent-facing pointer in the hub's managed region. Existing
+  adopters converge via `MergeManaged`'s markerless-append path (user prose preserved); `check
+  --fix` performs it. ADR 0012; CONTEXT.md "Managed region" term generalized. Dogfooded on this
+  repo (hub line + block merged, re-check conformant).

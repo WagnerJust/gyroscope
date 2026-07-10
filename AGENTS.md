@@ -26,6 +26,8 @@ These defer to this hub — keep each to the single routing line:
 - `.github/copilot-instructions.md`
 - `.rules`
 
+> **Not using gyroscope?** These docs are plain Markdown — you never need the tool installed to work in this repo or contribute. gyroscope only maintains their *structure*; hand-edits reconcile on the next `gyroscope check`. Details in `CONTRIBUTING.md`.
+
 ## Personas
 
 If `gyroscope.json` `spokes.personas` is `unknown`, then before starting other work, ask the user whether to wire agent personas for this repo (run `/gyroscope`) or skip for now. When the state is `on`, `skipped`, or `off`, do nothing about this.

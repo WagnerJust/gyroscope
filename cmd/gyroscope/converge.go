@@ -93,11 +93,14 @@ func classifyOne(abs, dest string, want []byte) convergeItem {
 		item.State = stateOK
 		return item
 	}
-	// The hub is the one file with a managed region: if its managed region can be
-	// brought current in place — by swapping an existing region, or by appending a
-	// region to a hand-written hub that has none (D1's "present, missing managed
-	// content") — that is a MERGE, not a CONFLICT. MergeManaged handles both.
-	if dest == "AGENTS.md" {
+	// A file that carries a managed region (the hub, or a spoke like CONTRIBUTING.md
+	// with a gyroscope-owned block) is not an all-or-nothing collision: if its
+	// managed region can be brought current in place — by swapping an existing
+	// region, or by appending a region to a file that has none (D1's "present,
+	// missing managed content") — that is a MERGE, not a CONFLICT. MergeManaged
+	// handles both. A file whose want-content has no markers falls through to the
+	// whole-file CONFLICT verdict below.
+	if _, hasRegion := standard.ManagedRegion(want); hasRegion {
 		if merged, ok := standard.MergeManaged(got, want); ok {
 			if bytes.Equal(merged, got) {
 				item.State = stateOK
@@ -156,8 +159,9 @@ func applyConverge(stdout io.Writer, abs string, items []convergeItem, adapters 
 			// Already current — nothing to do.
 			continue
 		case stateMerge:
-			// In-place managed-region injection (the hub). Atomic temp+rename.
-			if err := standard.InjectManaged(abs, it.Want); err != nil {
+			// In-place managed-region injection (the hub, or any managed spoke).
+			// Atomic temp+rename.
+			if err := standard.InjectManaged(abs, it.Dest, it.Want); err != nil {
 				return nil, errCannotRun(err)
 			}
 			fmt.Fprintf(stdout, "merged %s (managed region)\n", it.Dest)
