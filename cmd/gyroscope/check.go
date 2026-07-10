@@ -268,6 +268,37 @@ func checkRepo(repoDir string, cfg config.Config) (problems, notes []string, err
 		}
 	}
 
+	// 7b. Managed spokes: any planned file other than the hub whose standard content
+	// carries a gyroscope-managed region (e.g. CONTRIBUTING.md's contributor block)
+	// must, on disk, carry that region byte-for-byte. The hub is excluded — its
+	// region is config-rendered and verified semantically above (routes + personas
+	// directive); a spoke's region is static, so byte-equality is the right test. A
+	// missing or drifted region is nonconformance; `check --fix` re-injects it.
+	for _, f := range files {
+		if f.Dest == "AGENTS.md" {
+			continue
+		}
+		want, ok := standard.ManagedRegion(f.Content)
+		if !ok {
+			continue // not a managed spoke
+		}
+		if !exists(f.Dest) {
+			continue // absence is already reported by the planned-file check above
+		}
+		b, err := os.ReadFile(filepath.Join(repoDir, f.Dest))
+		if err != nil {
+			return nil, nil, err
+		}
+		got, ok := standard.ManagedRegion(b)
+		if !ok {
+			problems = append(problems, fmt.Sprintf("%s: gyroscope-managed region missing (run `gyroscope check --fix`)", f.Dest))
+			continue
+		}
+		if !bytes.Equal(got, want) {
+			problems = append(problems, fmt.Sprintf("%s: gyroscope-managed region differs from the standard (run `gyroscope check --fix`)", f.Dest))
+		}
+	}
+
 	// 8. State `on` means personas are wired: at least one non-README file under
 	// docs/agents/.
 	if cfg.Spokes.Personas == config.PersonaOn {

@@ -380,6 +380,79 @@ func TestCheckFixArchivesCompletedItems(t *testing.T) {
 	}
 }
 
+// A repo that adopted gyroscope before the contributor block existed has a
+// CONTRIBUTING.md with no managed region. `check` flags the missing block as drift,
+// and `check --fix` appends it (MergeManaged's markerless path) while preserving the
+// user's own prose — the "maintained repos stay first-class for tool-less devs" path.
+func TestCheckFixConvergesContributorBlock(t *testing.T) {
+	dir := initAndFill(t)
+	userDoc := "# Contributing\n\nOur own house rules. Keep them.\n"
+	if err := os.WriteFile(filepath.Join(dir, "CONTRIBUTING.md"), []byte(userDoc), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	var out, errb bytes.Buffer
+	if code := exitCodeOf(t, run([]string{"check", dir}, &out, &errb)); code != exitDrift {
+		t.Fatalf("expected drift for the missing contributor block, got code %d\n%s", code, out.String())
+	}
+	if !strings.Contains(out.String(), "CONTRIBUTING.md") {
+		t.Fatalf("drift should name CONTRIBUTING.md, got: %s", out.String())
+	}
+
+	out.Reset()
+	errb.Reset()
+	if err := run([]string{"check", dir, "--fix"}, &out, &errb); err != nil {
+		t.Fatalf("check --fix should converge the contributor block, got %v\n%s", err, out.String())
+	}
+	got, err := os.ReadFile(filepath.Join(dir, "CONTRIBUTING.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(got), "Our own house rules") {
+		t.Fatalf("--fix must preserve the user's CONTRIBUTING prose:\n%s", got)
+	}
+	if !strings.Contains(string(got), "do not need gyroscope installed") {
+		t.Fatalf("--fix must append the contributor block:\n%s", got)
+	}
+
+	out.Reset()
+	errb.Reset()
+	if err := run([]string{"check", dir}, &out, &errb); err != nil {
+		t.Fatalf("repo should be conformant after --fix, got %v\n%s", err, out.String())
+	}
+}
+
+// A hand-edited contributor block (markers intact, inner text changed) is drift;
+// check --fix swaps the managed region back to the standard.
+func TestCheckFlagsAndFixesDriftedContributorBlock(t *testing.T) {
+	dir := initAndFill(t)
+	p := filepath.Join(dir, "CONTRIBUTING.md")
+	b, err := os.ReadFile(p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	drifted := strings.Replace(string(b), "You do not need gyroscope installed", "You TOTALLY need gyroscope", 1)
+	if drifted == string(b) {
+		t.Fatal("test setup failed to alter the managed region")
+	}
+	if err := os.WriteFile(p, []byte(drifted), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	var out, errb bytes.Buffer
+	if code := exitCodeOf(t, run([]string{"check", dir}, &out, &errb)); code != exitDrift {
+		t.Fatalf("expected drift for the altered block, got code %d\n%s", code, out.String())
+	}
+	out.Reset()
+	errb.Reset()
+	if err := run([]string{"check", dir, "--fix"}, &out, &errb); err != nil {
+		t.Fatalf("--fix should restore the block, got %v\n%s", err, out.String())
+	}
+	got, _ := os.ReadFile(p)
+	if strings.Contains(string(got), "TOTALLY need") {
+		t.Fatalf("--fix should have reverted the drifted managed region:\n%s", got)
+	}
+}
+
 func TestCheckFixMergesManagedRegion(t *testing.T) {
 	dir := initAndFill(t)
 	// Drift the hub's managed region (blank it out) but keep user content around it.
