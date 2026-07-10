@@ -142,6 +142,36 @@ The hub carries a standing rule: when `gyroscope.json` `spokes.personas` is
 `unknown`, ask the user about personas before other work. Also run this flow when
 the user invokes `/gyroscope` explicitly.
 
+**First — reconcile what's already on disk (do this before the wire/skip decision,
+regardless of `spokes.personas` state).** `gyroscope check` is *config-relative*: it
+verifies the repo against `gyroscope.json`, so a `skipped`/`unknown`/`off` state means
+it never inspects persona files and a green `check` says **nothing** about them. Do not
+read green as "personas are handled." Look yourself:
+
+- Scan for persona-shaped files anywhere under `docs/agents/`, recursively — the mirror
+  reads only the root (`docs/agents/*.md`), so a subdir is exactly where a persona hides
+  unregistered: `grep -rl '^name:' docs/agents --include='*.md'`.
+- Classify each hit:
+  - **Root + `name:` frontmatter** (`docs/agents/<file>.md`) → canonical (ADR 0010).
+    Registers into `.claude/agents/` on `init --apply` once state is `on`.
+  - **In a subdir** (`docs/agents/personas/…`, etc.) → off the mirror's path, so it will
+    **never** register as a subagent. It is one of two things, and you must **ask** which
+    — do not assume:
+    - (a) a **doc-routed** persona, dispatched by prompt-injection from a runbook (e.g.
+      `review-checkpoints.md` references it). A valid, deliberate pattern — leave it.
+    - (b) a persona the author meant to register but mislaid. Move it to
+      `docs/agents/<name>.md`, kebab-case the `name:`, add a `description:`, then register.
+- Reconcile state-vs-disk when they disagree:
+  - Files present but state is `skipped`/`unknown` → surface it: "found N persona files
+    but the config says `<state>` — register them (root + `agents set on` + `init
+    --apply`), keep them doc-routed as-is, or leave skipped?" Let the user decide.
+  - State `on` but no root `name:` file → the mirror registers nothing; the files are in
+    a subdir or lack frontmatter. Fix the **layout**, don't just trust the flag.
+- If the user keeps a doc-routed setup on purpose, record the decision (`agents set
+  skipped` is fine) and stop — do not re-nag next session.
+
+Only once the reconcile is settled, run the wire/skip decision:
+
 1. **Ask:** "Wire agent personas for this repo now, or skip for now?"
 2. **Skip** → run `gyroscope agents set skipped`. Stop; do not revisit unless asked.
 3. **Wire** →
@@ -153,7 +183,15 @@ the user invokes `/gyroscope` explicitly.
       useful framing, adapt language to this repo's stack, and strip content that
       does not apply (web-only stacks, framework-specific tooling). Write the
       result to `docs/agents/<name>.md` — one file per persona, in Claude subagent
-      format (YAML frontmatter with `name:` plus the system-prompt body).
+      format: YAML frontmatter plus the system-prompt body. The frontmatter must
+      carry:
+      - `name:` **kebab-case** (`data-engineer`, not `Data Engineer`) — it becomes
+        both the `.claude/agents/<name>.md` filename and the dispatchable subagent
+        *type*, and a space breaks the type. Match the filename to it.
+      - `description:` a one-line trigger — Claude's auto-dispatch matches the task
+        against it, so a persona with no `description:` still registers but is
+        effectively never auto-selected.
+      - optional `tools:` / `model:`.
    d. Run `gyroscope agents set on`.
    e. Run `gyroscope init --apply` to **register** the personas: the binary mirrors
       each valid `docs/agents/` persona byte-for-byte into `.claude/agents/<name>.md`

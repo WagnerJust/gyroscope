@@ -238,3 +238,17 @@
   after `agents set on` + `init --apply` (no --force), `.claude/agents/` holds all 7 personas
   byte-equal to their `docs/agents/` source, README not mirrored; gyroscope self-check stays
   conformant (no personas → no mirror required).
+
+## Archive nudge convergence — `check --fix` archives done items (2026-07-10)
+- [x] **TODO→DONE move mechanized into `check --fix`.** The archive nudge (ADR 0009) fired at
+  check time to whoever ran check — usually the human — never reaching the mid-session agent
+  that finished a task, so the "move done items" rule needed manual reminding despite being
+  stated 3×. Now `check --fix` moves completed *top-level* `[x]` items (with their indented
+  sub-trees) out of the injected `TODO.md` into `DONE.md`'s `## Completed` section (newest on
+  top), converging the only check finding `--fix` previously couldn't fix. New pure
+  `internal/archive` package (`Plan`/`Merge`); new `fsutil.WriteAtomic` (temp+rename overwrite,
+  the second deliberate non-`WriteGuarded` write after the persona mirror), DONE-written-first
+  so a partial failure duplicates rather than loses work. Gated on `--fix` + the `state` spoke;
+  no-op when nothing is done. ADR 0011. Rejected a 4th prose line, a Stop-hook nag, and an
+  auto-mutating SessionStart hook (see ADR 0011 for why). Template `TODO.md` header updated to
+  point at the mechanized path.
