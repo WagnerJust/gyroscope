@@ -65,9 +65,10 @@
   atomic temp+rename overwrite on drift (the one deliberate non-WriteGuarded write).
   Missing/persona-less `docs/agents/` is a clean no-op. TDD: mirrors valid personas,
   excludes README + no-frontmatter files, dest bytes-equal source.
-- [ ] **F2 init wires the mirror.** `init --apply` runs the mirror when gated; dry-run
-  lists the `.claude/agents/` files it would write. Binary stays non-interactive; the
-  mirror is a byte copy, not a render.
+- [x] **F2 init wires the mirror** (879d1ab). `init --apply` registers personas by mirroring
+  each into `.claude/agents/` when gated (personas on AND `enforce.claude`); dry-run lists
+  the `.claude/agents/<name>.md` files it would write. Binary stays non-interactive; the
+  mirror is a byte copy, not a render. Gate via `personaMirrorGated` (shared with check).
 - [ ] **F3 check verifies registration.** For each canonical persona require
   `.claude/agents/<name>.md` present and byte-equal (drift = nonconformance); `--fix`
   re-mirrors. Same gate as F1; extend the existing `PersonaOn` block (`check.go:205`).

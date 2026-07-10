@@ -111,3 +111,91 @@ func TestInitApplyNoMirrorWhenClaudeDisabled(t *testing.T) {
 		t.Errorf(".claude/agents/ must not be created when the Claude adapter is disabled")
 	}
 }
+
+// initGatedWithPersona applies the standard into a fresh repo, fills the
+// scaffolds, sets personas on, writes a persona, and mirrors it — the conformant
+// registered baseline check should accept.
+func initGatedWithPersona(t *testing.T) string {
+	t.Helper()
+	dir := initAndFill(t)
+	var out, errb bytes.Buffer
+	if err := run([]string{"agents", "set", "on", dir}, &out, &errb); err != nil {
+		t.Fatalf("agents set on: %v (%s)", err, errb.String())
+	}
+	writePersona(t, dir, "verifier.md", samplePersona)
+	out.Reset()
+	errb.Reset()
+	// init --apply again to mirror the just-added persona. The filled scaffolds now
+	// differ from the raw templates, so this second apply reports drift (exit 1) on
+	// those unrelated conflicts — but persona registration runs independent of doc
+	// convergence, so the mirror is written regardless. Tolerate that drift here.
+	if err := run([]string{"init", dir, "--apply"}, &out, &errb); err != nil {
+		if code := exitCodeOf(t, err); code != exitDrift {
+			t.Fatalf("init --apply (mirror): %v (%s)", err, errb.String())
+		}
+	}
+	return dir
+}
+
+func TestCheckConformantWhenPersonaMirrored(t *testing.T) {
+	dir := initGatedWithPersona(t)
+	var out, errb bytes.Buffer
+	if err := run([]string{"check", dir}, &out, &errb); err != nil {
+		t.Fatalf("check should pass when the persona is mirrored, got %v\n%s", err, out.String())
+	}
+	if !strings.Contains(out.String(), "conformant") {
+		t.Fatalf("expected conformant, got: %s", out.String())
+	}
+}
+
+func TestCheckDriftsWhenPersonaMirrorMissing(t *testing.T) {
+	dir := initGatedWithPersona(t)
+	// Remove the registered mirror → the persona is no longer dispatchable.
+	if err := os.Remove(filepath.Join(dir, ".claude", "agents", "verifier.md")); err != nil {
+		t.Fatal(err)
+	}
+	var out, errb bytes.Buffer
+	err := run([]string{"check", dir}, &out, &errb)
+	if code := exitCodeOf(t, err); code != exitDrift {
+		t.Fatalf("missing mirror should drift, got code %d (%v)", code, err)
+	}
+	if !strings.Contains(out.String(), ".claude/agents/verifier.md") {
+		t.Fatalf("drift should name the missing mirror, got: %s", out.String())
+	}
+}
+
+func TestCheckDriftsWhenPersonaMirrorDiffers(t *testing.T) {
+	dir := initGatedWithPersona(t)
+	// Edit the registered mirror so it no longer matches the canonical source.
+	if err := os.WriteFile(filepath.Join(dir, ".claude", "agents", "verifier.md"), []byte("stale edited mirror\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	var out, errb bytes.Buffer
+	err := run([]string{"check", dir}, &out, &errb)
+	if code := exitCodeOf(t, err); code != exitDrift {
+		t.Fatalf("differing mirror should drift, got code %d (%v)", code, err)
+	}
+	if !strings.Contains(out.String(), ".claude/agents/verifier.md") {
+		t.Fatalf("drift should name the differing mirror, got: %s", out.String())
+	}
+}
+
+func TestCheckFixReMirrorsPersona(t *testing.T) {
+	dir := initGatedWithPersona(t)
+	mirror := filepath.Join(dir, ".claude", "agents", "verifier.md")
+	// Drift the mirror, then --fix should re-mirror it to convergence.
+	if err := os.WriteFile(mirror, []byte("stale\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	var out, errb bytes.Buffer
+	if err := run([]string{"check", dir, "--fix"}, &out, &errb); err != nil {
+		t.Fatalf("check --fix should converge, got %v\n%s", err, out.String())
+	}
+	got, err := os.ReadFile(mirror)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(got) != samplePersona {
+		t.Errorf("--fix did not re-mirror the persona; got %q", got)
+	}
+}

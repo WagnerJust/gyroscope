@@ -11,6 +11,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/WagnerJust/gyroscope/internal/config"
+	"github.com/WagnerJust/gyroscope/internal/persona"
 	"github.com/WagnerJust/gyroscope/internal/standard"
 	"github.com/WagnerJust/gyroscope/internal/target"
 )
@@ -65,6 +66,21 @@ func newCheckCmd(stdout io.Writer) *cobra.Command {
 				// below). --fix never clobbers user content.
 				if _, err := applyConverge(stdout, abs, items, adapters, paths, false); err != nil {
 					return err
+				}
+				// Re-mirror personas so registration converges too. gyroscope owns the
+				// .claude/agents/ mirror files, so this safely overwrites a drifted
+				// mirror (unlike the user-content-preserving convergence above). A
+				// closed gate mirrors nothing.
+				mirrors, err := planPersonaMirrors(abs, cfg)
+				if err != nil {
+					return errCannotRun(err)
+				}
+				written, err := persona.Write(abs, mirrors)
+				if err != nil {
+					return errCannotRun(err)
+				}
+				for _, dest := range written {
+					fmt.Fprintf(stdout, "mirrored persona %s\n", dest)
 				}
 			}
 
@@ -216,6 +232,31 @@ func checkRepo(repoDir string, cfg config.Config) (problems, notes []string, err
 		}
 		if !wired {
 			problems = append(problems, "docs/agents/: personas state is `on` but no persona files present (only README)")
+		}
+
+		// 8b. Registration: when the persona mirror is gated (personas on AND the
+		// Claude adapter enabled), each canonical persona must be mirrored into
+		// .claude/agents/<name>.md, byte-equal to its docs/agents/ source — that is
+		// what makes Claude register it as a dispatchable subagent (ADR 0010). A
+		// missing or drifted mirror is nonconformance; `check --fix` re-mirrors above.
+		if personaMirrorGated(cfg) {
+			mirrors, err := persona.Plan(repoDir)
+			if err != nil {
+				return nil, nil, err
+			}
+			for _, m := range mirrors {
+				got, err := os.ReadFile(filepath.Join(repoDir, m.Dest))
+				if os.IsNotExist(err) {
+					problems = append(problems, fmt.Sprintf("%s: persona not registered — mirror missing (run `gyroscope init --apply` or `check --fix`)", m.Dest))
+					continue
+				}
+				if err != nil {
+					return nil, nil, err
+				}
+				if !bytes.Equal(got, m.Bytes) {
+					problems = append(problems, fmt.Sprintf("%s: persona mirror differs from its docs/agents/ source (run `check --fix` to re-mirror)", m.Dest))
+				}
+			}
 		}
 	}
 
