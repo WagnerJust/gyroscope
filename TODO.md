@@ -58,11 +58,13 @@
 > exclude `README.md` + any file without `name:` frontmatter; gyroscope owns the
 > persona-named mirror files (overwrite on drift). Needs ADR 0010.
 
-- [ ] **F1 Persona mirror writer.** When gated, copy each `docs/agents/*.md` that is
-  a valid persona (has `name:` frontmatter) into `.claude/agents/<name>.md`, verbatim.
-  Exclude `README.md` and frontmatter-less files. Reuse the `docs/agents/` scan that
-  `check.go:205` already does. TDD: mirrors valid personas, excludes README +
-  no-frontmatter files, dest bytes-equal source.
+- [x] **F1 Persona mirror writer** (827e17d). New `internal/persona` package: when gated,
+  copies each `docs/agents/*.md` that is a valid persona (has `name:` frontmatter) into
+  `.claude/agents/<name>.md`, verbatim (dest filename from the frontmatter `name:`).
+  Excludes `README.md` and frontmatter-less files. gyroscope owns the mirror files:
+  atomic temp+rename overwrite on drift (the one deliberate non-WriteGuarded write).
+  Missing/persona-less `docs/agents/` is a clean no-op. TDD: mirrors valid personas,
+  excludes README + no-frontmatter files, dest bytes-equal source.
 - [ ] **F2 init wires the mirror.** `init --apply` runs the mirror when gated; dry-run
   lists the `.claude/agents/` files it would write. Binary stays non-interactive; the
   mirror is a byte copy, not a render.

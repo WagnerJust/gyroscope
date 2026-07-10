@@ -10,6 +10,7 @@ import (
 
 	"github.com/WagnerJust/gyroscope/internal/config"
 	"github.com/WagnerJust/gyroscope/internal/enforce"
+	"github.com/WagnerJust/gyroscope/internal/persona"
 	"github.com/WagnerJust/gyroscope/internal/standard"
 )
 
@@ -39,6 +40,12 @@ func newInitCmd(stdout io.Writer) *cobra.Command {
 			paths := hookPathsFor(cfg)
 			adapters := enabledAdapters(cfg)
 			items := classify(abs, files)
+			// Persona mirrors (docs/agents/<file> → .claude/agents/<name>.md) register
+			// each persona as a Claude subagent. Gated: personas on AND Claude enabled.
+			mirrors, err := planPersonaMirrors(abs, cfg)
+			if err != nil {
+				return errCannotRun(err)
+			}
 
 			if !apply {
 				fmt.Fprintf(stdout, "gyroscope init (dry-run)\n  repo: %s\n", abs)
@@ -56,6 +63,11 @@ func newInitCmd(stdout io.Writer) *cobra.Command {
 				for _, a := range adapters {
 					fmt.Fprintf(stdout, "  %s\n", a.PlanLine(paths))
 				}
+				// Surface the persona mirrors init would write, like the other planned
+				// writes. This is a byte copy for Claude registration, not a render.
+				for _, m := range mirrors {
+					fmt.Fprintf(stdout, "  mirror: %s (from %s)\n", m.Dest, m.Src)
+				}
 				// The merge-safe apply writes NEW + MERGE automatically; only a
 				// CONFLICT needs --force. Surface that when any conflict is present.
 				if c := conflicts(items); len(c) > 0 {
@@ -68,6 +80,16 @@ func newInitCmd(stdout io.Writer) *cobra.Command {
 			skipped, err := applyConverge(stdout, abs, items, adapters, paths, force)
 			if err != nil {
 				return err
+			}
+			// Register the personas: mirror each into .claude/agents/. Independent of
+			// the doc convergence above (a doc CONFLICT never blocks registration), and
+			// a no-op when the gate is closed (mirrors is empty).
+			written, err := persona.Write(abs, mirrors)
+			if err != nil {
+				return errCannotRun(err)
+			}
+			for _, dest := range written {
+				fmt.Fprintf(stdout, "mirrored persona %s\n", dest)
 			}
 			// The safe subset landed. If any CONFLICT was skipped, the repo is not
 			// yet fully conformant — report drift (exit 1) so a caller/CI can see

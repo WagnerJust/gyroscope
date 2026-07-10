@@ -119,6 +119,14 @@ func Copy(repoDir string) (written []string, err error) {
 	if err != nil {
 		return nil, err
 	}
+	return Write(repoDir, mirrors)
+}
+
+// Write copies each already-planned mirror under repoDir and returns the
+// destinations written. Callers that have already Plan-ned (init, check) reuse it
+// so the plan is not re-derived; Copy is the plan-then-write convenience. It
+// writes nothing (and creates no directory) for an empty plan.
+func Write(repoDir string, mirrors []Mirror) (written []string, err error) {
 	for _, m := range mirrors {
 		if err := writeMirror(filepath.Join(repoDir, m.Dest), m.Bytes); err != nil {
 			return written, err
