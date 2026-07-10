@@ -252,3 +252,16 @@
   no-op when nothing is done. ADR 0011. Rejected a 4th prose line, a Stop-hook nag, and an
   auto-mutating SessionStart hook (see ADR 0011 for why). Template `TODO.md` header updated to
   point at the mechanized path.
+
+## Contributor-facing, tool-optional docs (2026-07-10)
+- [x] **gyroscope-maintained repos are first-class for devs without gyroscope.** Generalized the
+  managed-region mechanism from hub-only to any spoke: `standard.InjectManaged` takes a `dest`,
+  converge's classifier keys the MERGE path on "want has a managed region" (not `dest ==
+  "AGENTS.md"`), and `check` byte-verifies each non-hub managed spoke (hub stays semantically
+  checked — its region is config-rendered). Added a managed **contributor block to
+  `CONTRIBUTING.md`** ("you don't need gyroscope installed; what the markers/`gyroscope.json`/
+  `.local/` mean; hand-edits reconcile on the next `check --fix`; optional zero-install `go run
+  …@latest check .`") plus a one-line agent-facing pointer in the hub's managed region. Existing
+  adopters converge via `MergeManaged`'s markerless-append path (user prose preserved); `check
+  --fix` performs it. ADR 0012; CONTEXT.md "Managed region" term generalized. Dogfooded on this
+  repo (hub line + block merged, re-check conformant).

@@ -34,3 +34,17 @@ drift.
 Follow the repo's commit convention (see `.gitmessage`): a concise
 `<type>: <imperative summary>` subject, with a body explaining *why* when the
 diff isn't self-explanatory.
+
+<!-- gyroscope:managed -->
+## Working with the gyroscope-maintained docs
+
+This repo's agent-facing docs — the `AGENTS.md` hub, the spokes it routes to, the
+pointer files (`CLAUDE.md`, `.cursorrules`, …), and any `.claude/agents/` personas
+— are scaffolded and kept in sync by [gyroscope](https://github.com/WagnerJust/gyroscope).
+**You do not need gyroscope installed to read these docs or to contribute.** They
+are plain Markdown; read and edit them like any other file, and open PRs the normal
+way described above.
+
+A few gyroscope-specific things you may notice, and what they mean:
+
+- `<!-- gyroscope:managed -->` … `<!-- /gyroscope -->
