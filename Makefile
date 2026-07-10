@@ -3,7 +3,7 @@ LDFLAGS := -X main.version=$(shell git describe --tags --always --dirty 2>/dev/n
            -X main.commit=$(shell git rev-parse --short HEAD 2>/dev/null || echo none) \
            -X main.date=$(shell date -u +%Y-%m-%dT%H:%M:%SZ)
 
-.PHONY: build test test-race vet
+.PHONY: build test test-race vet snapshot
 build:
 	go build -ldflags "$(LDFLAGS)" -o $(BIN) ./cmd/gyroscope
 test:
@@ -12,3 +12,7 @@ test-race:
 	go test -race ./...
 vet:
 	go vet ./...
+# Local cross-platform build via goreleaser — no tag, no publish. Proves the
+# release config compiles for every target before you push a v* tag.
+snapshot:
+	goreleaser release --snapshot --clean
