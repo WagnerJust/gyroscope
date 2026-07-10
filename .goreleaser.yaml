@@ -12,3 +12,24 @@ archives:
     format_overrides:
       - goos: windows
         formats: [zip]
+changelog:
+  use: github
+  sort: asc
+  filters:
+    exclude:
+      - '^docs:'
+      - '^test:'
+      - '^chore:'
+      - '^Merge '
+  groups:
+    - title: Features
+      regexp: '^.*?feat(\(.+\))??!?:.*$'
+      order: 0
+    - title: Bug fixes
+      regexp: '^.*?fix(\(.+\))??!?:.*$'
+      order: 1
+    - title: CI & build
+      regexp: '^.*?(ci|build|perf|refactor)(\(.+\))??!?:.*$'
+      order: 2
+    - title: Others
+      order: 999
