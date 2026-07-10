@@ -265,3 +265,14 @@
   adopters converge via `MergeManaged`'s markerless-append path (user prose preserved); `check
   --fix` performs it. ADR 0012; CONTEXT.md "Managed region" term generalized. Dogfooded on this
   repo (hub line + block merged, re-check conformant).
+
+## `.local/local.md` ready-to-use — no unfillable placeholder (2026-07-10)
+- [x] **Fixed the `.local` placeholder papercut.** `check --fix` created `.local/local.md` from a
+  `{{...}}`-marker scaffold that only the skill fills — but the skill never fills it (it is
+  personal, machine-specific, dev-authored). So on a fresh clone `--fix` manufactured a placeholder
+  the binary could not clear, regressing `check` from green (absence tolerated) to unfixable drift.
+  Root cause was miscategorization: `.local/local.md` is a *ready-to-use* personal file like
+  `.local/todo.md`, not a skill-fill scaffold. Rewrote `templates/local.md` as ready-to-use plain
+  prose (no `{{...}}`), so `check` no longer polices it and `--fix` converges a fresh repo to
+  conformant. Regression test `TestLocalScaffoldIsReadyToUse`. Verified on a fresh exodus worktree:
+  `check --fix` → conformant. Found while converging the exodus branch with the post-release binary.

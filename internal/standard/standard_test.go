@@ -52,6 +52,27 @@ func TestPlanDropsDisabledSpoke(t *testing.T) {
 	}
 }
 
+// .local/local.md is a personal, dev-filled file the skill never completes, so its
+// scaffold must be ready-to-use — carry NO `{{...}}` placeholder. Otherwise
+// `check --fix` creates it and the next `check` flags a placeholder the binary can
+// never fill (it tolerates the file being absent, so this would regress a fresh
+// clone from conformant to unfixable drift). Regression for the `.local` papercut.
+func TestLocalScaffoldIsReadyToUse(t *testing.T) {
+	files, err := Plan(config.Default())
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, f := range files {
+		if f.Dest == ".local/local.md" {
+			if strings.Contains(string(f.Content), "{{") {
+				t.Fatalf(".local/local.md scaffold must carry no `{{...}}` placeholder (the skill never fills it):\n%s", f.Content)
+			}
+			return
+		}
+	}
+	t.Fatal(".local/local.md not planned under default config")
+}
+
 func TestPlanIncludesL2ProcessArtifacts(t *testing.T) {
 	files, err := Plan(config.Default())
 	if err != nil {
