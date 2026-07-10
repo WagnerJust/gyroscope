@@ -414,6 +414,14 @@ func TestCheckFixConvergesContributorBlock(t *testing.T) {
 	if !strings.Contains(string(got), "do not need gyroscope installed") {
 		t.Fatalf("--fix must append the contributor block:\n%s", got)
 	}
+	// The whole block must land, not a marker-truncated prefix: assert its tail
+	// (the zero-install command) and a well-formed closing marker are present.
+	if !strings.Contains(string(got), "go run github.com/WagnerJust/gyroscope/cmd/gyroscope@latest check .") {
+		t.Fatalf("--fix wrote a truncated contributor block (missing the zero-install tail):\n%s", got)
+	}
+	if _, ok := standard.ManagedRegion(got); !ok {
+		t.Fatalf("--fix wrote a contributor block without a well-formed managed region:\n%s", got)
+	}
 
 	out.Reset()
 	errb.Reset()

@@ -47,11 +47,11 @@ way described above.
 
 A few gyroscope-specific things you may notice, and what they mean:
 
-- `<!-- gyroscope:managed -->` … `<!-- /gyroscope -->` markers fence the regions
-  gyroscope owns (including this section). You *may* edit inside them and nothing
-  breaks — but the next `gyroscope check --fix` a maintainer or CI runs reconciles
-  that region back to the standard, so it may overwrite your change. Put durable
-  prose **outside** the markers, where it is yours to keep.
+- Paired `gyroscope:managed` / `/gyroscope` HTML-comment markers fence the regions
+  gyroscope owns (including this section). You *may* edit inside a fenced region and
+  nothing breaks — but the next `gyroscope check --fix` a maintainer or CI runs
+  reconciles that region back to the standard, so it may overwrite your change. Put
+  durable prose **outside** the fences, where it is yours to keep.
 - `gyroscope.json` records which doc spokes are enabled. Harmless to ignore.
 - `.local/` is gitignored personal scratch — never committed, never shared.
 
