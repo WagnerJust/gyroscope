@@ -47,4 +47,19 @@ way described above.
 
 A few gyroscope-specific things you may notice, and what they mean:
 
-- `<!-- gyroscope:managed -->` … `<!-- /gyroscope -->
+- Paired `gyroscope:managed` / `/gyroscope` HTML-comment markers fence the regions
+  gyroscope owns (including this section). You *may* edit inside a fenced region and
+  nothing breaks — but the next `gyroscope check --fix` a maintainer or CI runs
+  reconciles that region back to the standard, so it may overwrite your change. Put
+  durable prose **outside** the fences, where it is yours to keep.
+- `gyroscope.json` records which doc spokes are enabled. Harmless to ignore.
+- `.local/` is gitignored personal scratch — never committed, never shared.
+
+You never have to run gyroscope: a maintainer or CI keeps the docs conformant. If
+you *want* to check or converge them yourself without installing anything, it is a
+single dependency-light Go binary, runnable straight from source:
+
+    go run github.com/WagnerJust/gyroscope/cmd/gyroscope@latest check .
+
+Add `--fix` to converge the safe drift. That is entirely optional.
+<!-- /gyroscope -->

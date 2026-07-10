@@ -52,6 +52,27 @@ func TestPlanDropsDisabledSpoke(t *testing.T) {
 	}
 }
 
+// A managed region is located by a naive search for the first close marker after
+// the open, so a template whose region *body* embeds either marker literal makes
+// ManagedRegion truncate at that in-prose marker — silently shipping a cut-off
+// block (byte-equal want/got still reads as conformant). Forbid nested markers in
+// every managed template's region. Regression for the truncated contributor block.
+func TestManagedTemplatesHaveNoNestedMarkers(t *testing.T) {
+	files, err := Plan(config.Default())
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, f := range files {
+		region, ok := ManagedRegion(f.Content)
+		if !ok {
+			continue
+		}
+		if strings.Contains(string(region), ManagedOpen) || strings.Contains(string(region), ManagedClose) {
+			t.Fatalf("%s: managed region embeds a marker literal — ManagedRegion truncates at it; describe the markers without the raw `<!-- ... -->` syntax", f.Dest)
+		}
+	}
+}
+
 // .local/local.md is a personal, dev-filled file the skill never completes, so its
 // scaffold must be ready-to-use — carry NO `{{...}}` placeholder. Otherwise
 // `check --fix` creates it and the next `check` flags a placeholder the binary can

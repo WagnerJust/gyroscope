@@ -276,3 +276,17 @@
   prose (no `{{...}}`), so `check` no longer polices it and `--fix` converges a fresh repo to
   conformant. Regression test `TestLocalScaffoldIsReadyToUse`. Verified on a fresh exodus worktree:
   `check --fix` → conformant. Found while converging the exodus branch with the post-release binary.
+
+## Contributor block was truncated by self-referential markers (2026-07-10)
+- [x] **Fixed the truncated CONTRIBUTING.md contributor block.** The block's prose explained the
+  markers by quoting them literally (`<!-- gyroscope:managed -->` / `<!-- /gyroscope -->`).
+  `ManagedRegion` locates a region by the *first* close marker after the open, so it stopped at the
+  in-prose marker and shipped a block cut off mid-bullet — missing the `gyroscope.json`/`.local`
+  notes, the "you never have to run gyroscope" paragraph, and the zero-install command. Invisible to
+  `check` because `want` and `got` truncate identically (byte-equal → conformant), and the original
+  tests only asserted early substrings. Fix: rewrite the prose to name the markers without the raw
+  `<!-- ... -->` syntax. Guards: `TestManagedTemplatesHaveNoNestedMarkers` (no managed template's
+  region may embed a marker literal) + strengthened the converge test to assert the block's tail
+  (zero-install line + well-formed close) lands. Re-converged this repo; exodus + any adopter
+  self-heal on the next `check --fix` with the fixed binary. Caught by Justin eyeballing the exodus
+  CONTRIBUTING.md. (Deeper option not taken: line-anchor marker detection in `ManagedRegion`.)
