@@ -32,3 +32,25 @@ func WriteGuarded(repoDir, relPath string, content []byte, force bool) error {
 	}
 	return werr
 }
+
+// WriteAtomic writes content to repoDir/relPath via a temp file + rename, creating
+// parent dirs. Unlike WriteGuarded it OVERWRITES an existing file — the atomic
+// rename means a reader never sees a partial file and an interrupted write cannot
+// truncate the target. Reserved for gyroscope-performed rewrites of files that are
+// expected to already exist (the TODO→DONE archive move), never first-time
+// scaffolds — those keep WriteGuarded's clobber refusal.
+func WriteAtomic(repoDir, relPath string, content []byte) error {
+	dest := filepath.Join(repoDir, relPath)
+	if err := os.MkdirAll(filepath.Dir(dest), 0o755); err != nil {
+		return err
+	}
+	tmp := dest + ".gyroscope.tmp"
+	if err := os.WriteFile(tmp, content, 0o644); err != nil {
+		return err
+	}
+	if err := os.Rename(tmp, dest); err != nil {
+		os.Remove(tmp)
+		return fmt.Errorf("write %s: %w", relPath, err)
+	}
+	return nil
+}

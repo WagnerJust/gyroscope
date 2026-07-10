@@ -5,9 +5,10 @@
 > the SessionStart hook so a fresh agent chat resumes where the last one stopped
 > instead of re-deriving context.
 >
-> **When a task is done, move its line to `DONE.md`.** This file is injected every
-> session, so keep it small — the completed archive lives in `DONE.md` (routed, not
-> injected). Keep it current; keep it terse.
+> **When a task is done, move its line to `DONE.md`** — or let `gyroscope check
+> --fix` do it: it archives completed top-level `[x]` items into `DONE.md` for you.
+> This file is injected every session, so keep it small — the completed archive lives
+> in `DONE.md` (routed, not injected). Keep it current; keep it terse.
 
 **Legend:** `[ ]` not started · `[~]` in progress · `[x]` done (then move to `DONE.md`)
 

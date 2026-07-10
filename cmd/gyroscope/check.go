@@ -10,7 +10,9 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/WagnerJust/gyroscope/internal/archive"
 	"github.com/WagnerJust/gyroscope/internal/config"
+	"github.com/WagnerJust/gyroscope/internal/fsutil"
 	"github.com/WagnerJust/gyroscope/internal/persona"
 	"github.com/WagnerJust/gyroscope/internal/standard"
 	"github.com/WagnerJust/gyroscope/internal/target"
@@ -82,6 +84,21 @@ func newCheckCmd(stdout io.Writer) *cobra.Command {
 				for _, dest := range written {
 					fmt.Fprintf(stdout, "mirrored persona %s\n", dest)
 				}
+
+				// Archive completed top-level tasks: move `- [x]` items from the
+				// injected TODO.md into the non-injected DONE.md so the per-session
+				// context stays lean. This is the convergence half of the archive
+				// nudge (ADR 0009) — until now the only check finding --fix could not
+				// fix. Gated on the state spoke; a no-op when nothing is done to move.
+				if cfg.Spokes.State {
+					moved, err := archiveDone(abs)
+					if err != nil {
+						return errCannotRun(err)
+					}
+					if moved > 0 {
+						fmt.Fprintf(stdout, "archived %d completed item(s) to DONE.md\n", moved)
+					}
+				}
 			}
 
 			problems, notes, err := checkRepo(abs, cfg)
@@ -106,6 +123,41 @@ func newCheckCmd(stdout io.Writer) *cobra.Command {
 	f := cmd.Flags()
 	f.BoolVar(&fix, "fix", false, "Auto-apply the safe convergence (create NEW files, merge the hub's managed region); conflicts still report as drift.")
 	return cmd
+}
+
+// archiveDone moves completed top-level tasks from TODO.md into DONE.md's
+// `## Completed` section and returns how many blocks moved. It rewrites both files
+// atomically. A missing TODO.md, or no completed top-level `[x]` item, is a no-op
+// returning 0 (nothing written). DONE.md is created from the moved content when
+// absent, though `check --fix`'s convergence normally scaffolds it first.
+//
+// DONE.md is written before TODO.md on purpose: if the second write fails, the
+// items are duplicated (still in TODO, now also in DONE) rather than lost — a safe
+// re-run converges, and no completed work vanishes.
+func archiveDone(repoDir string) (int, error) {
+	todoBytes, err := os.ReadFile(filepath.Join(repoDir, "TODO.md"))
+	if os.IsNotExist(err) {
+		return 0, nil
+	}
+	if err != nil {
+		return 0, err
+	}
+	remaining, moved := archive.Plan(string(todoBytes))
+	if len(moved) == 0 {
+		return 0, nil
+	}
+	doneBytes, err := os.ReadFile(filepath.Join(repoDir, "DONE.md"))
+	if err != nil && !os.IsNotExist(err) {
+		return 0, err
+	}
+	newDone := archive.Merge(string(doneBytes), moved)
+	if err := fsutil.WriteAtomic(repoDir, "DONE.md", []byte(newDone)); err != nil {
+		return 0, err
+	}
+	if err := fsutil.WriteAtomic(repoDir, "TODO.md", []byte(remaining)); err != nil {
+		return 0, err
+	}
+	return len(moved), nil
 }
 
 // archiveNudgeThreshold is the count of completed `[x]` items in TODO.md above

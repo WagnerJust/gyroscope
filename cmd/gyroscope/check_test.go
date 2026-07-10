@@ -331,6 +331,55 @@ func TestCheckFixConvergesMissingSpoke(t *testing.T) {
 	}
 }
 
+// check --fix converges the archive nudge too: it moves completed top-level tasks
+// out of the injected TODO.md into DONE.md, so a later plain check is quiet. This is
+// the mechanism that closes ADR 0009's convention-with-no-teeth gap — the nudge was
+// the only finding --fix could not fix.
+func TestCheckFixArchivesCompletedItems(t *testing.T) {
+	dir := initAndFill(t)
+	setTODO(t, dir, "# TODO\n\n## Next\n- [ ] keep me open\n"+
+		"- [x] done a\n- [x] done b\n- [x] done c\n- [x] done d\n- [x] done e\n- [x] done f\n")
+
+	var out, errb bytes.Buffer
+	if err := run([]string{"check", dir, "--fix"}, &out, &errb); err != nil {
+		t.Fatalf("check --fix should archive and exit 0, got %v\n%s", err, out.String())
+	}
+	if !strings.Contains(out.String(), "archived") {
+		t.Fatalf("expected an 'archived N' line, got: %s", out.String())
+	}
+
+	todo, err := os.ReadFile(filepath.Join(dir, "TODO.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(todo), "- [x]") {
+		t.Fatalf("TODO.md should have no completed items after --fix:\n%s", todo)
+	}
+	if !strings.Contains(string(todo), "keep me open") {
+		t.Fatalf("--fix must keep open items in TODO.md:\n%s", todo)
+	}
+
+	done, err := os.ReadFile(filepath.Join(dir, "DONE.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, item := range []string{"done a", "done f"} {
+		if !strings.Contains(string(done), item) {
+			t.Fatalf("DONE.md should contain archived %q:\n%s", item, done)
+		}
+	}
+
+	// A plain check afterward is conformant and no longer nudges.
+	out.Reset()
+	errb.Reset()
+	if err := run([]string{"check", dir}, &out, &errb); err != nil {
+		t.Fatalf("repo should be conformant after archiving, got %v\n%s", err, out.String())
+	}
+	if strings.Contains(out.String(), "archive them to DONE.md") {
+		t.Fatalf("nudge should be gone after --fix archived the items, got: %s", out.String())
+	}
+}
+
 func TestCheckFixMergesManagedRegion(t *testing.T) {
 	dir := initAndFill(t)
 	// Drift the hub's managed region (blank it out) but keep user content around it.
