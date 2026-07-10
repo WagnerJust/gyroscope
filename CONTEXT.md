@@ -86,8 +86,24 @@ real, repo-specific content. None should survive in a filled, committed doc.
 
 ### The binary
 `gyroscope`: the deterministic, non-interactive CLI. It guarantees *structure +
-hook* and never fills placeholders.
-_Avoid:_ conflating it with the skill (the skill supplies content).
+hook + persona registration* and never fills placeholders. It **copies** persona
+bytes (the persona mirror) but never **authors** persona content — copying bytes is
+not rendering; the skill authors, the binary mirrors (see ADR 0010).
+_Avoid:_ conflating it with the skill (the skill supplies content); "the binary
+never touches personas" (it registers them by byte copy, it just never writes their
+content).
+
+### Persona mirror
+The byte-for-byte copy of each valid `docs/agents/` persona into
+`.claude/agents/<name>.md` that makes Claude register it as a dispatchable subagent.
+`docs/agents/` stays the canonical, hub-routed source; the mirror is a generated,
+gyroscope-owned file (overwritten on drift, atomically) — the one deliberate
+exception to `WriteGuarded`'s refuse-to-clobber. Runs only when
+`spokes.personas == on` AND `enforce.claude` (Claude-specific). A *valid* persona is
+a `docs/agents/*.md` other than `README.md` whose frontmatter carries a `name:`; the
+dest filename is that `name:` (see ADR 0010).
+_Avoid:_ "symlink" (it is a copy — drift caught by check); implying the binary
+authors the content (it copies bytes the skill authored).
 
 ### The skill
 `/gyroscope`: the companion (embedded `skill/SKILL.md`, installed via

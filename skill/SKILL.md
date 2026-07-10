@@ -152,8 +152,17 @@ the user invokes `/gyroscope` explicitly.
    c. For each pick, read the template and **customize it to this repo**: keep the
       useful framing, adapt language to this repo's stack, and strip content that
       does not apply (web-only stacks, framework-specific tooling). Write the
-      result to `docs/agents/<name>.md` — one file per persona.
+      result to `docs/agents/<name>.md` — one file per persona, in Claude subagent
+      format (YAML frontmatter with `name:` plus the system-prompt body).
    d. Run `gyroscope agents set on`.
+   e. Run `gyroscope init --apply` to **register** the personas: the binary mirrors
+      each valid `docs/agents/` persona byte-for-byte into `.claude/agents/<name>.md`
+      so Claude scans and dispatches them as subagents (gated on personas `on` +
+      the Claude adapter; see ADR 0010). Without this, the personas are authored and
+      hub-routed but never dispatchable. `docs/agents/` stays canonical — edit
+      personas there and re-run; never hand-edit the generated `.claude/agents/`
+      mirror. `gyroscope check` flags a missing or drifted mirror; `check --fix`
+      re-mirrors.
 
 Persona-fit guidance for a Go/CLI backend repo:
 - code-reviewer templates → quality-review framing.
@@ -164,9 +173,11 @@ Persona-fit guidance for a Go/CLI backend repo:
 - Avoid generic "senior web developer" personas — they inject irrelevant web/UI
   concerns into a Go CLI.
 
-The binary never reads or writes persona content — that is entirely this skill's
-job. The binary only records the decision (`gyroscope agents set …`) and scaffolds
-the empty `docs/agents/` spoke.
+The binary never **authors** persona content — that is entirely this skill's job.
+The binary records the decision (`gyroscope agents set …`), scaffolds the empty
+`docs/agents/` spoke, and **registers** personas by copying their bytes into
+`.claude/agents/` (ADR 0010) — but it never writes the content itself. It copies
+bytes; it does not render.
 
 ## PI enforcement (opt-in)
 

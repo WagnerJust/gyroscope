@@ -69,16 +69,19 @@
   each into `.claude/agents/` when gated (personas on AND `enforce.claude`); dry-run lists
   the `.claude/agents/<name>.md` files it would write. Binary stays non-interactive; the
   mirror is a byte copy, not a render. Gate via `personaMirrorGated` (shared with check).
-- [ ] **F3 check verifies registration.** For each canonical persona require
-  `.claude/agents/<name>.md` present and byte-equal (drift = nonconformance); `--fix`
-  re-mirrors. Same gate as F1; extend the existing `PersonaOn` block (`check.go:205`).
-- [ ] **F4 Docs + ADR + dogfood.** ADR 0010 (persona registration mirror; the
-  docs-vs-registered asymmetry vs cavecrew; copy-not-symlink; binary now mirrors
-  persona bytes but still doesn't author content). Update CONTEXT.md (the binary/
-  persona nuance), the hub personas note, and SKILL.md (personas now register into
-  `.claude/agents/`). Prove on a FRESH notwhoop clone: after `init --apply`,
-  `.claude/agents/` holds its 7 personas (dispatchable); gyroscope self-check stays
-  conformant (it has no personas → no mirror required).
+- [x] **F3 check verifies registration** (d6b11f9). When gated, for each canonical persona
+  require `.claude/agents/<name>.md` present and byte-equal to its `docs/agents/` source
+  (missing/differing = nonconformance); `check --fix` re-mirrors to converge. Extended the
+  existing `PersonaOn` block in `check.go`. TDD: conformant when mirrored, drift when
+  missing/edited, `--fix` re-mirrors.
+- [x] **F4 Docs + ADR + dogfood** (5c27053). ADR 0010 (persona registration mirror;
+  the docs-vs-registered asymmetry vs cavecrew; copy-not-symlink; binary now mirrors persona
+  bytes but still doesn't author content). Updated CONTEXT.md (refined "The binary" nuance +
+  new "Persona mirror" term), the personas-spoke README template, and SKILL.md (personas now
+  register into `.claude/agents/` via `init --apply`). Dogfooded on a FRESH notwhoop clone:
+  after `agents set on` + `init --apply` (no --force), `.claude/agents/` holds all 7 personas
+  byte-equal to their `docs/agents/` source, README not mirrored; gyroscope self-check stays
+  conformant (no personas → no mirror required).
 
 ## Later — deferred (explicitly out of MVP)
 - [ ] **Zed enforcement adapter** — active `enforce.Adapter` for Zed (the passive `.rules` doc-target pointer already exists; this is the force-inject side, parallel to Claude's SessionStart hook / PI's `session_start` extension). Investigate Zed's injection mechanism (does its agent support a session-start hook / rule that force-reads the hub, or is `.rules` native-read only?). If native-read only, there may be nothing to enforce — document that outcome. Wire behind the `enforce` config section (`zed`, opt-in) if a mechanism exists.
