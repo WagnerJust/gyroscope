@@ -53,3 +53,7 @@ existing hub while leaving your surrounding content untouched, and skips anythin
 already current. Only a genuine CONFLICT — a whole file that differs with no
 managed region to merge into — needs `--force`. `gyroscope check --fix` applies the
 same safe convergence, then re-checks; unresolved conflicts still report as drift.
+
+## License
+
+MIT — see [LICENSE](LICENSE).
