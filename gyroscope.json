@@ -1,0 +1,18 @@
+{
+  "spokes": {
+    "context": true,
+    "agents": true,
+    "adr": true,
+    "personas": "on",
+    "local": true,
+    "contributing": true,
+    "state": true,
+    "prTemplate": true,
+    "commitConvention": true
+  },
+  "enforce": {
+    "claude": true,
+    "pi": false
+  },
+  "custom": null
+}
