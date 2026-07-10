@@ -1,0 +1,17 @@
+name: flaky-test detector
+# Re-runs the suite many times to surface intermittent failures. A flake in an
+# autonomous AI loop is far more dangerous than in a human one, so track it
+# explicitly on a schedule rather than waiting to notice it at PR time.
+on:
+  schedule:
+    - cron: '0 7 * * 1'   # weekly, Monday 07:00 UTC
+  workflow_dispatch:
+jobs:
+  flaky:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with: { go-version: '1.24' }
+      - name: re-run tests to surface flakes
+        run: go test -count=10 -race ./...

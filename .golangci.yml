@@ -1,0 +1,17 @@
+# golangci-lint config — the L3 lint gate (see .github/workflows/ci.yml).
+# Default linters (errcheck, gosimple, govet, ineffassign, staticcheck, unused)
+# plus gofmt so CI's format check and the linter agree on one tool.
+run:
+  timeout: 5m
+
+linters:
+  enable:
+    - gofmt
+
+issues:
+  exclude-rules:
+    # Test helpers routinely ignore os.WriteFile / MkdirAll / json.Unmarshal
+    # errors on throwaway temp dirs; requiring checks there is pure noise.
+    - path: _test.go
+      linters:
+        - errcheck

@@ -1,0 +1,27 @@
+name: nightly
+# Heavy checks that don't fit the per-PR latency budget: the full coverage
+# suite (drift on slow-changing paths) and a govulncheck security scan.
+# Scheduled, not PR-gating — a red run is a signal, not a merge blocker.
+on:
+  schedule:
+    - cron: '0 6 * * *'   # daily 06:00 UTC
+  workflow_dispatch:
+jobs:
+  coverage:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with: { go-version: '1.24' }
+      - name: full coverage suite
+        run: |
+          go test -covermode=atomic -coverprofile=cover.out ./...
+          go tool cover -func=cover.out
+  security:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with: { go-version: '1.24' }
+      - name: govulncheck security scan
+        run: go run golang.org/x/vuln/cmd/govulncheck@latest ./...
