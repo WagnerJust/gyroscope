@@ -74,7 +74,7 @@
   (missing/differing = nonconformance); `check --fix` re-mirrors to converge. Extended the
   existing `PersonaOn` block in `check.go`. TDD: conformant when mirrored, drift when
   missing/edited, `--fix` re-mirrors.
-- [x] **F4 Docs + ADR + dogfood** (5c27053). ADR 0010 (persona registration mirror;
+- [x] **F4 Docs + ADR + dogfood** (1bf486c). ADR 0010 (persona registration mirror;
   the docs-vs-registered asymmetry vs cavecrew; copy-not-symlink; binary now mirrors persona
   bytes but still doesn't author content). Updated CONTEXT.md (refined "The binary" nuance +
   new "Persona mirror" term), the personas-spoke README template, and SKILL.md (personas now
