@@ -44,6 +44,39 @@
 ## Known non-issues (kept for context; not action items)
 - [ ] (note, not fixed) `go build ./cmd/gyroscope` reports `dev (commit none, built unknown)` — no ldflags; `make build` is the versioned path. Expected, documented as the "quick local binary."
 
+## Persona registration — mirror docs/agents → .claude/agents (2026-07-09)
+> Problem (finding #2): `docs/agents/` personas are authored in valid Claude
+> subagent format but live where Claude Code does NOT scan for subagents
+> (`.claude/agents/`), so they never register as dispatchable agent types — the
+> model reaches for registered ones (caveman `cavecrew`) instead. Fix (option C):
+> keep `docs/agents/` canonical + hub-routed, and MIRROR each persona into
+> `.claude/agents/` so Claude registers it. Claude-specific, enforcement-adapter-
+> shaped, sits beside the SessionStart hook. Scope shift to note: the binary now
+> COPIES persona files (registration) — it still never AUTHORS persona content
+> (that stays the skill's job). Gate: `personas == on` AND `enforce.claude` on.
+> Decisions: copy (not symlink — robust across clones/OS, drift caught by check);
+> exclude `README.md` + any file without `name:` frontmatter; gyroscope owns the
+> persona-named mirror files (overwrite on drift). Needs ADR 0010.
+
+- [ ] **F1 Persona mirror writer.** When gated, copy each `docs/agents/*.md` that is
+  a valid persona (has `name:` frontmatter) into `.claude/agents/<name>.md`, verbatim.
+  Exclude `README.md` and frontmatter-less files. Reuse the `docs/agents/` scan that
+  `check.go:205` already does. TDD: mirrors valid personas, excludes README +
+  no-frontmatter files, dest bytes-equal source.
+- [ ] **F2 init wires the mirror.** `init --apply` runs the mirror when gated; dry-run
+  lists the `.claude/agents/` files it would write. Binary stays non-interactive; the
+  mirror is a byte copy, not a render.
+- [ ] **F3 check verifies registration.** For each canonical persona require
+  `.claude/agents/<name>.md` present and byte-equal (drift = nonconformance); `--fix`
+  re-mirrors. Same gate as F1; extend the existing `PersonaOn` block (`check.go:205`).
+- [ ] **F4 Docs + ADR + dogfood.** ADR 0010 (persona registration mirror; the
+  docs-vs-registered asymmetry vs cavecrew; copy-not-symlink; binary now mirrors
+  persona bytes but still doesn't author content). Update CONTEXT.md (the binary/
+  persona nuance), the hub personas note, and SKILL.md (personas now register into
+  `.claude/agents/`). Prove on a FRESH notwhoop clone: after `init --apply`,
+  `.claude/agents/` holds its 7 personas (dispatchable); gyroscope self-check stays
+  conformant (it has no personas → no mirror required).
+
 ## Later — deferred (explicitly out of MVP)
 - [ ] **Zed enforcement adapter** — active `enforce.Adapter` for Zed (the passive `.rules` doc-target pointer already exists; this is the force-inject side, parallel to Claude's SessionStart hook / PI's `session_start` extension). Investigate Zed's injection mechanism (does its agent support a session-start hook / rule that force-reads the hub, or is `.rules` native-read only?). If native-read only, there may be nothing to enforce — document that outcome. Wire behind the `enforce` config section (`zed`, opt-in) if a mechanism exists.
 - [ ] **Cursor enforcement adapter** — active `enforce.Adapter` for Cursor (passive `.cursorrules` pointer already exists). Investigate Cursor's mechanism: `.cursor/rules/*.mdc` with `alwaysApply: true` (always-injected project rules) and/or Cursor hooks. An always-applied rule that force-reads the hub would be the enforcement analog. Wire behind the `enforce` config section (`cursor`, opt-in).
