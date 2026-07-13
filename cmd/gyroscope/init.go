@@ -91,6 +91,11 @@ func newInitCmd(stdout io.Writer) *cobra.Command {
 			for _, dest := range written {
 				fmt.Fprintf(stdout, "mirrored persona %s\n", dest)
 			}
+			// Suppress AI attribution when configured (enforce.aiAttribution=false):
+			// write includeCoAuthoredBy:false into .claude/settings.json.
+			if err := applyAttribution(stdout, abs, cfg); err != nil {
+				return err
+			}
 			// The safe subset landed. If any CONFLICT was skipped, the repo is not
 			// yet fully conformant — report drift (exit 1) so a caller/CI can see
 			// that --force is still needed, mirroring `check`'s drift signal. A clean

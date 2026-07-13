@@ -12,6 +12,7 @@ import (
 
 	"github.com/WagnerJust/gyroscope/internal/archive"
 	"github.com/WagnerJust/gyroscope/internal/config"
+	"github.com/WagnerJust/gyroscope/internal/enforce"
 	"github.com/WagnerJust/gyroscope/internal/fsutil"
 	"github.com/WagnerJust/gyroscope/internal/persona"
 	"github.com/WagnerJust/gyroscope/internal/standard"
@@ -98,6 +99,12 @@ func newCheckCmd(stdout io.Writer) *cobra.Command {
 					if moved > 0 {
 						fmt.Fprintf(stdout, "archived %d completed item(s) to DONE.md\n", moved)
 					}
+				}
+
+				// Suppress AI attribution when configured (enforce.aiAttribution=false):
+				// converge includeCoAuthoredBy:false into .claude/settings.json.
+				if err := applyAttribution(stdout, abs, cfg); err != nil {
+					return err
 				}
 			}
 
@@ -389,6 +396,22 @@ func checkRepo(repoDir string, cfg config.Config) (problems, notes []string, err
 					"TODO.md: %d completed `[x]` items (> %d) — archive them to DONE.md to keep the injected file small",
 					done, archiveNudgeThreshold))
 			}
+		}
+	}
+
+	// AI attribution: when suppression is configured (enforce.aiAttribution=false)
+	// and the Claude adapter is on, .claude/settings.json must carry
+	// includeCoAuthoredBy:false — the native lever that drops the co-author trailer /
+	// generated-by line. Absent or true is drift; `check --fix` sets it. gyroscope
+	// manages the key only under suppression, so an attribution-on repo is never
+	// checked for it.
+	if cfg.Enforce.Claude && !cfg.Enforce.AIAttribution {
+		v, present, err := enforce.CoAuthoredBy(repoDir)
+		if err != nil {
+			return nil, nil, err
+		}
+		if !present || v {
+			problems = append(problems, ".claude/settings.json: AI attribution suppressed (enforce.aiAttribution=false) but includeCoAuthoredBy is not false (run `gyroscope check --fix`)")
 		}
 	}
 

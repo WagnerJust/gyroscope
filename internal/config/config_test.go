@@ -118,7 +118,7 @@ func TestEnforceAbsentKeepsDefaults(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if cfg.Enforce != (EnforceSet{Claude: true, PI: false}) {
+	if cfg.Enforce != (EnforceSet{Claude: true, PI: false, AIAttribution: true}) {
 		t.Fatalf("absent enforce should be default, got %+v", cfg.Enforce)
 	}
 }
@@ -177,5 +177,31 @@ func TestPersonasBadStateWrapsFilename(t *testing.T) {
 func TestDefaultPersonasUnknown(t *testing.T) {
 	if Default().Spokes.Personas != PersonaUnknown {
 		t.Fatalf("default personas should be unknown, got %q", Default().Spokes.Personas)
+	}
+}
+
+// AIAttribution defaults on (unchanged behavior) and toggles off only when
+// explicitly set false — including when the enforce block is present but omits the
+// key, which must retain the default via the Default()-base merge.
+func TestAIAttributionDefaultOnTogglesOff(t *testing.T) {
+	if !Default().Enforce.AIAttribution {
+		t.Fatal("aiAttribution should default true")
+	}
+	dir := t.TempDir()
+	write := func(json string) Config {
+		if err := os.WriteFile(filepath.Join(dir, "gyroscope.json"), []byte(json), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		cfg, err := Load(dir)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return cfg
+	}
+	if write(`{"enforce":{"claude":true,"aiAttribution":false}}`).Enforce.AIAttribution {
+		t.Fatal("explicit aiAttribution:false must load false")
+	}
+	if !write(`{"enforce":{"claude":true}}`).Enforce.AIAttribution {
+		t.Fatal("omitted aiAttribution must retain default true even when enforce is present")
 	}
 }

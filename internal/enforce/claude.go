@@ -46,13 +46,9 @@ func (c Claude) Verify(repoDir string, paths []string) (bool, error) {
 // Returns changed=false when the hook is already present.
 func (Claude) Install(repoDir string, command string) (changed bool, err error) {
 	path := filepath.Join(repoDir, ".claude", "settings.json")
-	settings := map[string]any{}
-	if b, rerr := os.ReadFile(path); rerr == nil {
-		if err := json.Unmarshal(b, &settings); err != nil {
-			return false, err
-		}
-	} else if !os.IsNotExist(rerr) {
-		return false, rerr
+	settings, err := readSettings(path)
+	if err != nil {
+		return false, err
 	}
 
 	// Fail loud rather than silently overwriting a settings file whose "hooks"
@@ -81,31 +77,89 @@ func (Claude) Install(repoDir string, command string) (changed bool, err error) 
 	})
 	settings["hooks"] = hooks
 
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+	if err := writeSettings(path, settings); err != nil {
 		return false, err
 	}
-	// Encode without HTML-escaping so a shell command like "2>/dev/null" is written
-	// literally rather than as "2>/dev/null". Encoder.Encode adds a trailing
-	// newline for us.
+	return true, nil
+}
+
+// readSettings loads a .claude/settings.json object, returning an empty map when the
+// file is absent. A malformed file is an error rather than a silent reset — gyroscope
+// merges into the user's settings and must never clobber an unparseable one.
+func readSettings(path string) (map[string]any, error) {
+	settings := map[string]any{}
+	b, err := os.ReadFile(path)
+	if os.IsNotExist(err) {
+		return settings, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	if err := json.Unmarshal(b, &settings); err != nil {
+		return nil, err
+	}
+	return settings, nil
+}
+
+// writeSettings encodes settings back to path, creating .claude/ as needed. It
+// disables HTML-escaping so a shell fragment like "2>/dev/null" is written literally
+// (not "2>/dev/null"), and writes via a sibling temp file + rename so an interrupted
+// write can never truncate the user's settings — a reader sees the old file or the new.
+func writeSettings(path string, settings map[string]any) error {
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		return err
+	}
 	var buf bytes.Buffer
 	enc := json.NewEncoder(&buf)
 	enc.SetEscapeHTML(false)
 	enc.SetIndent("", "  ")
 	if err := enc.Encode(settings); err != nil {
-		return false, err
+		return err
 	}
-	// Write to a sibling temp file then rename, so an interrupted write can never
-	// truncate the user's existing settings.json — a reader sees old or new, never
-	// a partial file.
 	tmp := path + ".gyroscope.tmp"
 	if err := os.WriteFile(tmp, buf.Bytes(), 0o644); err != nil {
-		return false, err
+		return err
 	}
 	if err := os.Rename(tmp, path); err != nil {
 		os.Remove(tmp)
+		return err
+	}
+	return nil
+}
+
+// SetCoAuthoredBy sets the top-level includeCoAuthoredBy key in
+// repoDir/.claude/settings.json, preserving every other setting. This is Claude
+// Code's lever for the "Co-Authored-By: Claude" git trailer and the "Generated with
+// Claude Code" line on commits and PRs. gyroscope writes the key only to SUPPRESS
+// attribution (include=false); it never forces it true, leaving Claude's own default
+// otherwise. Returns changed=false when the key already holds include.
+func SetCoAuthoredBy(repoDir string, include bool) (changed bool, err error) {
+	path := filepath.Join(repoDir, ".claude", "settings.json")
+	settings, err := readSettings(path)
+	if err != nil {
+		return false, err
+	}
+	if cur, ok := settings["includeCoAuthoredBy"].(bool); ok && cur == include {
+		return false, nil
+	}
+	settings["includeCoAuthoredBy"] = include
+	if err := writeSettings(path, settings); err != nil {
 		return false, err
 	}
 	return true, nil
+}
+
+// CoAuthoredBy reports the includeCoAuthoredBy setting in
+// repoDir/.claude/settings.json: value is its boolean, present whether the key exists
+// as a bool. A missing settings file reports present=false. Read-only inverse of
+// SetCoAuthoredBy.
+func CoAuthoredBy(repoDir string) (value, present bool, err error) {
+	settings, err := readSettings(filepath.Join(repoDir, ".claude", "settings.json"))
+	if err != nil {
+		return false, false, err
+	}
+	v, ok := settings["includeCoAuthoredBy"].(bool)
+	return v, ok, nil
 }
 
 // HasSessionStart reports whether repoDir/.claude/settings.json already carries a

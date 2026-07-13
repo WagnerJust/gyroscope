@@ -9,6 +9,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/WagnerJust/gyroscope/internal/enforce"
 	"github.com/WagnerJust/gyroscope/internal/standard"
 )
 
@@ -577,5 +578,66 @@ func TestCheckPassesWithDisabledSpoke(t *testing.T) {
 	}
 	if !strings.Contains(out.String(), "conformant") {
 		t.Fatalf("expected a conformant confirmation, got: %s", out.String())
+	}
+}
+
+// enforce.aiAttribution=false suppresses AI attribution via the Claude-native lever:
+// init writes includeCoAuthoredBy=false, check flags a non-false value as drift, and
+// --fix converges it back. gyroscope manages the key only under suppression.
+func TestAIAttributionSuppression(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "gyroscope.json"), []byte(`{"enforce":{"claude":true,"aiAttribution":false}}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	var out, errb bytes.Buffer
+	if err := run([]string{"init", dir, "--apply"}, &out, &errb); err != nil {
+		t.Fatalf("init --apply: %v (%s)", err, errb.String())
+	}
+	fillPlaceholders(t, dir)
+
+	assertCoAuthored := func(want bool) {
+		t.Helper()
+		v, present, err := enforce.CoAuthoredBy(dir)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !present || v != want {
+			t.Fatalf("includeCoAuthoredBy: present=%v value=%v, want present && %v", present, v, want)
+		}
+	}
+	assertCoAuthored(false) // init suppressed it
+
+	// Flip it back to true → check reports drift naming the key.
+	if _, err := enforce.SetCoAuthoredBy(dir, true); err != nil {
+		t.Fatal(err)
+	}
+	out.Reset()
+	errb.Reset()
+	if code := exitCodeOf(t, run([]string{"check", dir}, &out, &errb)); code != exitDrift {
+		t.Fatalf("expected drift when includeCoAuthoredBy=true under suppression, got code %d\n%s", code, out.String())
+	}
+	if !strings.Contains(out.String(), "includeCoAuthoredBy") {
+		t.Fatalf("drift should name includeCoAuthoredBy, got: %s", out.String())
+	}
+
+	// --fix converges it back to false.
+	out.Reset()
+	errb.Reset()
+	if err := run([]string{"check", dir, "--fix"}, &out, &errb); err != nil {
+		t.Fatalf("--fix should re-suppress attribution and exit 0, got %v\n%s", err, out.String())
+	}
+	assertCoAuthored(false)
+}
+
+// The default (attribution on) never writes the key — gyroscope leaves Claude's own
+// default in place and check does not police it.
+func TestAIAttributionDefaultLeavesKeyUnmanaged(t *testing.T) {
+	dir := initAndFill(t) // default config: aiAttribution on
+	if _, present, err := enforce.CoAuthoredBy(dir); err != nil || present {
+		t.Fatalf("default config must not write includeCoAuthoredBy (present=%v err=%v)", present, err)
+	}
+	var out, errb bytes.Buffer
+	if err := run([]string{"check", dir}, &out, &errb); err != nil {
+		t.Fatalf("attribution-on repo should be conformant, got %v\n%s", err, out.String())
 	}
 }
