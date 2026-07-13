@@ -392,7 +392,55 @@ func checkRepo(repoDir string, cfg config.Config) (problems, notes []string, err
 		}
 	}
 
+	// Ship-to-team note (soft, never drift): when the Claude adapter is on but the
+	// repo gitignores `.claude/`, the SessionStart hook (and, with personas on, the
+	// `.claude/agents/` mirror) are version-control-invisible — a teammate who clones
+	// gets the tracked docs but no auto-injection and no dispatchable subagents, so
+	// the "self-enforcing, ships to the team" promise silently breaks. Advise a
+	// targeted `!`-negation. Advisory only: gitignoring `.claude/` is a legitimate
+	// choice, so this is a note, not nonconformance.
+	if cfg.Enforce.Claude && claudeShipBlocked(repoDir) {
+		msg := ".gitignore: `.claude/` is ignored, so the SessionStart hook won't ship to teammates"
+		neg := "add `!.claude/settings.json`"
+		if cfg.Spokes.Personas == config.PersonaOn {
+			msg += " (nor the `.claude/agents/` persona mirror)"
+			neg += " and `!.claude/agents/`"
+		}
+		notes = append(notes, msg+" — "+neg+" after the `.claude/` line to commit the enforcement (keep `.claude/settings.local.json` ignored)")
+	}
+
 	return problems, notes, nil
+}
+
+// claudeShipBlocked reports whether repoDir's root .gitignore would keep gyroscope's
+// Claude enforcement out of version control — it ignores `.claude/` (blanket) with no
+// `!`-negation re-including the hook. It is a deliberately small heuristic parse (no
+// git dependency): it recognizes a blanket `.claude` / `.claude/` ignore and honors a
+// negation for the hook path or for all of `.claude/`. Good enough for a soft note —
+// the negation it advises makes the note go away. Nested/edge .gitignore forms may
+// slip past; that only costs a missed advisory, never a wrong hard failure.
+func claudeShipBlocked(repoDir string) bool {
+	b, err := os.ReadFile(filepath.Join(repoDir, ".gitignore"))
+	if err != nil {
+		return false
+	}
+	ignores, negated := false, false
+	for _, ln := range strings.Split(string(b), "\n") {
+		t := strings.TrimSpace(ln)
+		if t == "" || strings.HasPrefix(t, "#") {
+			continue
+		}
+		switch strings.TrimPrefix(t, "/") {
+		case ".claude", ".claude/", ".claude/*", ".claude/**":
+			ignores = true
+		}
+		switch t {
+		case "!.claude", "!.claude/", "!/.claude", "!/.claude/",
+			"!.claude/settings.json", "!/.claude/settings.json":
+			negated = true
+		}
+	}
+	return ignores && !negated
 }
 
 // routesSection returns the trimmed body of the hub's `## Routes` section — the

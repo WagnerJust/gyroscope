@@ -177,6 +177,47 @@ func TestCheckArchiveNudgeUnderThresholdIsSilent(t *testing.T) {
 	}
 }
 
+// When the Claude adapter is on but .claude/ is gitignored, the SessionStart hook
+// (and, with personas on, the .claude/agents/ mirror) are local-only — a teammate
+// who clones gets the tracked docs but no auto-injection. check emits a soft note
+// advising a targeted negation, without failing (gitignoring .claude/ is legit).
+func TestCheckNotesGitignoredClaudeDir(t *testing.T) {
+	dir := initAndFill(t)
+	gi := filepath.Join(dir, ".gitignore")
+	base, err := os.ReadFile(gi)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(gi, append(append([]byte{}, base...), []byte("\n.claude/\n")...), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	var out, errb bytes.Buffer
+	if err := run([]string{"check", dir}, &out, &errb); err != nil {
+		t.Fatalf("gitignored .claude/ is advisory, must stay exit 0, got %v\n%s", err, out.String())
+	}
+	s := out.String()
+	if !strings.Contains(s, "conformant") {
+		t.Fatalf("should still be conformant, got: %s", s)
+	}
+	if !strings.Contains(s, "won't ship") || !strings.Contains(s, "!.claude/settings.json") {
+		t.Fatalf("expected a ship-to-team note advising the negation, got: %s", s)
+	}
+
+	// A negation re-including the hook cancels the note.
+	if err := os.WriteFile(gi, append(append([]byte{}, base...), []byte("\n.claude/\n!.claude/settings.json\n")...), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	out.Reset()
+	errb.Reset()
+	if err := run([]string{"check", dir}, &out, &errb); err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(out.String(), "won't ship") {
+		t.Fatalf("a `!.claude/settings.json` negation should cancel the note, got: %s", out.String())
+	}
+}
+
 // initAndFillPI is initAndFill with PI enforcement enabled.
 func initAndFillPI(t *testing.T) string {
 	t.Helper()
