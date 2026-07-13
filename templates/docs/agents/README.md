@@ -12,7 +12,7 @@ When personas are `on` and the Claude adapter is enabled, `gyroscope init`/`chec
 `.claude/agents/<name>.md` (that is where Claude scans for subagents; this
 directory is the canonical, hub-routed source). The mirror is generated and
 gyroscope-owned — don't hand-edit `.claude/agents/`; edit the persona here and
-re-run. `check` flags a missing or drifted mirror (see `docs/adr/0010`).
+re-run. `check` flags a missing or drifted mirror.
 
 <!-- gyroscope creates this directory and README as a blessed home for personas.
 It does not ship personas itself; it copies persona bytes into .claude/agents/ for

@@ -55,9 +55,11 @@ A few gyroscope-specific things you may notice, and what they mean:
 - `gyroscope.json` records which doc spokes are enabled. Harmless to ignore.
 - `.local/` is gitignored personal scratch — never committed, never shared.
 
-You never have to run gyroscope: a maintainer or CI keeps the docs conformant. If
-you *want* to check or converge them yourself without installing anything, it is a
-single dependency-light Go binary, runnable straight from source:
+You never have to run gyroscope — these docs are plain Markdown and hand-edits are
+safe. If a maintainer or CI happens to run `gyroscope check` it reconciles any
+drift; if no one does, nothing breaks. If you *want* to check or converge them
+yourself without installing anything, it is a single dependency-light Go binary,
+runnable straight from source:
 
     go run github.com/WagnerJust/gyroscope/cmd/gyroscope@latest check .
 
