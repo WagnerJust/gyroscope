@@ -290,3 +290,40 @@
   (zero-install line + well-formed close) lands. Re-converged this repo; exodus + any adopter
   self-heal on the next `check --fix` with the fixed binary. Caught by Justin eyeballing the exodus
   CONTRIBUTING.md. (Deeper option not taken: line-anchor marker detection in `ManagedRegion`.)
+
+## Skill adopt-reconcile step for pre-existing personas (2026-07-10)
+- [x] **Persona flow now reconciles what's already on disk before wire/skip.** The flow was
+  greenfield-only (ask → pick templates → write → mirror) with no branch for a repo that already
+  has personas; `gyroscope check` is config-relative, so a `skipped`/`unknown`/`off` state never
+  inspects `docs/agents/` and green said nothing about unregistered persona files (esp. in a
+  `docs/agents/personas/` subdir the root-only mirror can't see). Added a **first** step to
+  `skill/SKILL.md`'s persona flow (commit `beb7516`): scan `docs/agents/**` recursively for
+  `name:`-bearing files regardless of config state (`grep -rl '^name:'`), classify root-canonical
+  (ADR 0010) vs subdir (ask which — doc-routed-on-purpose vs mislaid, don't assume), reconcile
+  state-vs-disk disagreement, then fall through to wire/skip. **Binary untouched** — it stays
+  config-relative and deterministic; the judgment lives in the skill (the binary/skill split).
+  Motivated by the exodus adopt session; see the doc-routed-persona pattern in
+  `review-checkpoints.md` and ADR 0010. (TODO line and the SKILL.md step landed in the same commit;
+  archived here once verified present in HEAD.)
+
+## Adopter hardening — PR #5 (2026-07-10)
+- [x] **Adopter-facing scaffold fixes.** `templates/docs/agents/README.md` cited `docs/adr/0010` (an
+  internal gyroscope ADR no adopter scaffolds) — dead link removed. `templates/CONTRIBUTING.md`
+  asserted "a maintainer or CI keeps the docs conformant" — gyroscope writes no CI — reworded to
+  conditional. Commit `ad4390d`. Found in a cold-reader review of an adopted repo.
+- [x] **`check` warns when `.claude/` is gitignored** (`d8cdbcf`). The enforcement hook
+  (`.claude/settings.json`) and persona mirror (`.claude/agents/`) live under `.claude/`; a blanket
+  gitignore keeps them out of version control, so teammates get the tracked docs but no
+  auto-injection and no dispatchable subagents. Soft note (advisory, exits 0) advising a targeted
+  `!.claude/settings.json` negation; heuristic `.gitignore` parse, no git dependency.
+- [x] **`enforce.aiAttribution` toggle** (`c3e82cb` + `00ceb07`). New `gyroscope.json` key (default
+  `true`). When `false`: Claude-native — `init`/`check --fix` write `includeCoAuthoredBy:false` into
+  `.claude/settings.json` (drops the `Co-Authored-By` trailer + generated-by line); cross-harness — a
+  managed hub directive (SessionStart-injected) tells PI/Cursor/etc. and reinforces Claude to add no
+  attribution/sign-off. `check` verifies both. Scoped to AI credit, **not** the developer's DCO
+  `Signed-off-by`. Works for non-gyroscope teammates via the committed settings + injected rule.
+  Refactored settings.json read/atomic-write into shared `readSettings`/`writeSettings`.
+- [x] **Cold-reader legibility (scoped slice)** (`afc6af5`). Added a "what these files are" map to the
+  CONTRIBUTING managed block — pointer files (redirects, not config), `docs/agents.md` (file) vs
+  `docs/agents/` (dir), and that `.gitmessage` needs `git config commit.template` to activate.
+  Explain, don't restructure; structural changes (renames, per-file comments) left by design.
