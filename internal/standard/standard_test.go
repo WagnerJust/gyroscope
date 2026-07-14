@@ -390,3 +390,33 @@ func TestWriteForceOverwritesExisting(t *testing.T) {
 		t.Fatalf("force-written AGENTS.md should match template content")
 	}
 }
+
+// The no-AI-attribution hub directive appears only when attribution is suppressed
+// (enforce.aiAttribution=false); the default (on) renders no directive and the marker
+// is removed, keeping an attribution-on hub byte-identical to before the toggle.
+func TestAttributionDirectiveOnlyWhenSuppressed(t *testing.T) {
+	if AttributionDirective(config.Default()) != "" {
+		t.Fatal("attribution on (default) → no directive")
+	}
+	off := config.Default()
+	off.Enforce.AIAttribution = false
+	if d := AttributionDirective(off); d == "" || !strings.Contains(d, "Co-Authored-By") {
+		t.Fatalf("attribution off → a directive naming the trailer, got %q", d)
+	}
+	files, err := Plan(off)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var hub string
+	for _, f := range files {
+		if f.Dest == "AGENTS.md" {
+			hub = string(f.Content)
+		}
+	}
+	if !strings.Contains(hub, "## AI attribution") {
+		t.Fatalf("suppressed hub should carry the directive:\n%s", hub)
+	}
+	if strings.Contains(hub, attributionMarker) {
+		t.Fatal("the attribution marker should be rendered out, not left literal")
+	}
+}

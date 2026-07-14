@@ -272,6 +272,13 @@ func checkRepo(repoDir string, cfg config.Config) (problems, notes []string, err
 					problems = append(problems, "AGENTS.md: personas directive missing or altered (run `gyroscope init`)")
 				}
 			}
+
+			// 7c. When AI attribution is suppressed, the managed region carries the
+			// standing no-attribution directive — the cross-harness (prompt-injection)
+			// half of the toggle, for harnesses without a native co-author setting.
+			if d := standard.AttributionDirective(cfg); d != "" && !strings.Contains(string(region), d) {
+				problems = append(problems, "AGENTS.md: AI-attribution directive missing or altered (run `gyroscope init`)")
+			}
 		}
 	}
 

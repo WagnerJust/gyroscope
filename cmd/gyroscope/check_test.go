@@ -641,3 +641,53 @@ func TestAIAttributionDefaultLeavesKeyUnmanaged(t *testing.T) {
 		t.Fatalf("attribution-on repo should be conformant, got %v\n%s", err, out.String())
 	}
 }
+
+// Cross-harness half of the toggle: suppressing attribution injects a managed hub
+// directive (so PI/Cursor/etc. honor it); check verifies it and --fix restores it.
+func TestAIAttributionHubDirective(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "gyroscope.json"), []byte(`{"enforce":{"claude":true,"aiAttribution":false}}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	var out, errb bytes.Buffer
+	if err := run([]string{"init", dir, "--apply"}, &out, &errb); err != nil {
+		t.Fatalf("init --apply: %v (%s)", err, errb.String())
+	}
+	fillPlaceholders(t, dir)
+
+	hub, err := os.ReadFile(filepath.Join(dir, "AGENTS.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(hub), "## AI attribution") || !strings.Contains(string(hub), "Co-Authored-By") {
+		t.Fatalf("suppressed repo hub should carry the no-attribution directive:\n%s", hub)
+	}
+
+	// Alter the directive inside the managed region → drift; --fix restores it.
+	region, ok := standard.ManagedRegion(hub)
+	if !ok {
+		t.Fatal("hub should have a managed region")
+	}
+	drifted := strings.Replace(string(hub), string(region),
+		strings.Replace(string(region), "## AI attribution", "## Gone", 1), 1)
+	if err := os.WriteFile(filepath.Join(dir, "AGENTS.md"), []byte(drifted), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	out.Reset()
+	errb.Reset()
+	if code := exitCodeOf(t, run([]string{"check", dir}, &out, &errb)); code != exitDrift {
+		t.Fatalf("expected drift when the attribution directive is altered, got %d\n%s", code, out.String())
+	}
+	if !strings.Contains(out.String(), "attribution directive") {
+		t.Fatalf("drift should name the attribution directive, got: %s", out.String())
+	}
+	out.Reset()
+	errb.Reset()
+	if err := run([]string{"check", dir, "--fix"}, &out, &errb); err != nil {
+		t.Fatalf("--fix should restore the directive and exit 0, got %v\n%s", err, out.String())
+	}
+	hub2, _ := os.ReadFile(filepath.Join(dir, "AGENTS.md"))
+	if !strings.Contains(string(hub2), "## AI attribution") {
+		t.Fatalf("--fix should have restored the directive:\n%s", hub2)
+	}
+}
