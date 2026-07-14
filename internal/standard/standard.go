@@ -57,6 +57,7 @@ func Plan(cfg config.Config) ([]File, error) {
 		if e.dest == "AGENTS.md" {
 			b = renderRoutes(b, cfg)
 			b = renderPersonasDirective(b, cfg)
+			b = renderAttributionDirective(b, cfg)
 		}
 		files = append(files, File{Dest: e.dest, Content: b})
 	}
@@ -115,6 +116,42 @@ func renderPersonasDirective(hub []byte, cfg config.Config) []byte {
 		return []byte(s)
 	}
 	return []byte(strings.Replace(s, personasMarker, d, 1))
+}
+
+// attributionMarker is where the hub's standing no-AI-attribution directive is
+// spliced in — only when attribution is suppressed (enforce.aiAttribution=false).
+const attributionMarker = "<!-- gyroscope:attribution-directive -->"
+
+// AttributionDirective returns the hub's standing instruction to withhold AI
+// authorship credit when attribution is suppressed, else "". It is the cross-harness
+// (prompt-injection) half of the aiAttribution toggle — the SessionStart hook injects
+// the hub, so PI / Cursor / any harness without a native co-author setting still honor
+// it (the Claude-native `includeCoAuthoredBy` covers Claude). Single source of truth,
+// shared by renderAttributionDirective and `gyroscope check`.
+func AttributionDirective(cfg config.Config) string {
+	if cfg.Enforce.AIAttribution {
+		return ""
+	}
+	return "## AI attribution\n\n" +
+		"Do NOT add AI-authorship credit to commits, pull requests, or merge requests — " +
+		"no `Co-Authored-By` agent trailer, no \"Generated with …\" footer, no agent sign-off " +
+		"line. This is a repo policy (`gyroscope.json` `enforce.aiAttribution: false`). It does " +
+		"not affect the developer's own DCO `Signed-off-by`."
+}
+
+// renderAttributionDirective replaces attributionMarker in the hub with the directive
+// for cfg. When attribution is on (the default) the marker and its preceding blank
+// line are removed cleanly, so an attribution-on hub is byte-identical to before this
+// toggle existed.
+func renderAttributionDirective(hub []byte, cfg config.Config) []byte {
+	d := AttributionDirective(cfg)
+	s := string(hub)
+	if d == "" {
+		s = strings.Replace(s, "\n"+attributionMarker, "", 1)
+		s = strings.Replace(s, attributionMarker, "", 1)
+		return []byte(s)
+	}
+	return []byte(strings.Replace(s, attributionMarker, d, 1))
 }
 
 // Routes returns the hub's route block for cfg — the newline-joined bullets

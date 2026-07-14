@@ -28,6 +28,12 @@ type Config struct {
 type EnforceSet struct {
 	Claude bool `json:"claude"`
 	PI     bool `json:"pi"`
+	// AIAttribution controls whether AI agents may sign their work — the
+	// `Co-Authored-By` trailer / "Generated with …" footer on commits and PRs/MRs.
+	// Default true (unchanged behavior). Set false to suppress it repo-wide: the
+	// Claude adapter writes `includeCoAuthoredBy:false` into .claude/settings.json,
+	// and the hub carries a standing directive so other harnesses honor it too.
+	AIAttribution bool `json:"aiAttribution"`
 }
 
 // CustomSpoke is a user-defined spoke: a doc file gyroscope scaffolds and routes
@@ -114,7 +120,7 @@ func Default() Config {
 			Context: true, Agents: true, ADR: true, Personas: PersonaUnknown, Local: true,
 			Contributing: true, PRTemplate: true, CommitConvention: true, State: true,
 		},
-		Enforce: EnforceSet{Claude: true, PI: false},
+		Enforce: EnforceSet{Claude: true, PI: false, AIAttribution: true},
 	}
 }
 

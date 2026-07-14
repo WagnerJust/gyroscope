@@ -209,3 +209,23 @@ func applyConverge(stdout io.Writer, abs string, items []convergeItem, adapters 
 	}
 	return skipped, nil
 }
+
+// applyAttribution enforces the Claude-native half of the AI-attribution toggle: when
+// the Claude adapter is on and attribution is suppressed (enforce.aiAttribution=false),
+// write includeCoAuthoredBy:false into .claude/settings.json, preserving other settings.
+// gyroscope touches the key ONLY to suppress; a repo that leaves attribution on (the
+// default) never has the key written, so Claude's own default stands. Shared by
+// `init --apply` and `check --fix` so detect and converge stay symmetric.
+func applyAttribution(stdout io.Writer, abs string, cfg config.Config) error {
+	if !cfg.Enforce.Claude || cfg.Enforce.AIAttribution {
+		return nil
+	}
+	changed, err := enforce.SetCoAuthoredBy(abs, false)
+	if err != nil {
+		return errCannotRun(err)
+	}
+	if changed {
+		fmt.Fprintln(stdout, "set .claude/settings.json includeCoAuthoredBy=false (AI attribution suppressed)")
+	}
+	return nil
+}

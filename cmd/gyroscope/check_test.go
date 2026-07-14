@@ -9,6 +9,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/WagnerJust/gyroscope/internal/enforce"
 	"github.com/WagnerJust/gyroscope/internal/standard"
 )
 
@@ -174,6 +175,47 @@ func TestCheckArchiveNudgeUnderThresholdIsSilent(t *testing.T) {
 	}
 	if strings.Contains(s, "archive") || strings.Contains(s, "DONE.md") {
 		t.Fatalf("under-threshold repo must draw no archive nudge, got: %s", s)
+	}
+}
+
+// When the Claude adapter is on but .claude/ is gitignored, the SessionStart hook
+// (and, with personas on, the .claude/agents/ mirror) are local-only — a teammate
+// who clones gets the tracked docs but no auto-injection. check emits a soft note
+// advising a targeted negation, without failing (gitignoring .claude/ is legit).
+func TestCheckNotesGitignoredClaudeDir(t *testing.T) {
+	dir := initAndFill(t)
+	gi := filepath.Join(dir, ".gitignore")
+	base, err := os.ReadFile(gi)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(gi, append(append([]byte{}, base...), []byte("\n.claude/\n")...), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	var out, errb bytes.Buffer
+	if err := run([]string{"check", dir}, &out, &errb); err != nil {
+		t.Fatalf("gitignored .claude/ is advisory, must stay exit 0, got %v\n%s", err, out.String())
+	}
+	s := out.String()
+	if !strings.Contains(s, "conformant") {
+		t.Fatalf("should still be conformant, got: %s", s)
+	}
+	if !strings.Contains(s, "won't ship") || !strings.Contains(s, "!.claude/settings.json") {
+		t.Fatalf("expected a ship-to-team note advising the negation, got: %s", s)
+	}
+
+	// A negation re-including the hook cancels the note.
+	if err := os.WriteFile(gi, append(append([]byte{}, base...), []byte("\n.claude/\n!.claude/settings.json\n")...), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	out.Reset()
+	errb.Reset()
+	if err := run([]string{"check", dir}, &out, &errb); err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(out.String(), "won't ship") {
+		t.Fatalf("a `!.claude/settings.json` negation should cancel the note, got: %s", out.String())
 	}
 }
 
@@ -536,5 +578,116 @@ func TestCheckPassesWithDisabledSpoke(t *testing.T) {
 	}
 	if !strings.Contains(out.String(), "conformant") {
 		t.Fatalf("expected a conformant confirmation, got: %s", out.String())
+	}
+}
+
+// enforce.aiAttribution=false suppresses AI attribution via the Claude-native lever:
+// init writes includeCoAuthoredBy=false, check flags a non-false value as drift, and
+// --fix converges it back. gyroscope manages the key only under suppression.
+func TestAIAttributionSuppression(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "gyroscope.json"), []byte(`{"enforce":{"claude":true,"aiAttribution":false}}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	var out, errb bytes.Buffer
+	if err := run([]string{"init", dir, "--apply"}, &out, &errb); err != nil {
+		t.Fatalf("init --apply: %v (%s)", err, errb.String())
+	}
+	fillPlaceholders(t, dir)
+
+	assertCoAuthored := func(want bool) {
+		t.Helper()
+		v, present, err := enforce.CoAuthoredBy(dir)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !present || v != want {
+			t.Fatalf("includeCoAuthoredBy: present=%v value=%v, want present && %v", present, v, want)
+		}
+	}
+	assertCoAuthored(false) // init suppressed it
+
+	// Flip it back to true → check reports drift naming the key.
+	if _, err := enforce.SetCoAuthoredBy(dir, true); err != nil {
+		t.Fatal(err)
+	}
+	out.Reset()
+	errb.Reset()
+	if code := exitCodeOf(t, run([]string{"check", dir}, &out, &errb)); code != exitDrift {
+		t.Fatalf("expected drift when includeCoAuthoredBy=true under suppression, got code %d\n%s", code, out.String())
+	}
+	if !strings.Contains(out.String(), "includeCoAuthoredBy") {
+		t.Fatalf("drift should name includeCoAuthoredBy, got: %s", out.String())
+	}
+
+	// --fix converges it back to false.
+	out.Reset()
+	errb.Reset()
+	if err := run([]string{"check", dir, "--fix"}, &out, &errb); err != nil {
+		t.Fatalf("--fix should re-suppress attribution and exit 0, got %v\n%s", err, out.String())
+	}
+	assertCoAuthored(false)
+}
+
+// The default (attribution on) never writes the key — gyroscope leaves Claude's own
+// default in place and check does not police it.
+func TestAIAttributionDefaultLeavesKeyUnmanaged(t *testing.T) {
+	dir := initAndFill(t) // default config: aiAttribution on
+	if _, present, err := enforce.CoAuthoredBy(dir); err != nil || present {
+		t.Fatalf("default config must not write includeCoAuthoredBy (present=%v err=%v)", present, err)
+	}
+	var out, errb bytes.Buffer
+	if err := run([]string{"check", dir}, &out, &errb); err != nil {
+		t.Fatalf("attribution-on repo should be conformant, got %v\n%s", err, out.String())
+	}
+}
+
+// Cross-harness half of the toggle: suppressing attribution injects a managed hub
+// directive (so PI/Cursor/etc. honor it); check verifies it and --fix restores it.
+func TestAIAttributionHubDirective(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "gyroscope.json"), []byte(`{"enforce":{"claude":true,"aiAttribution":false}}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	var out, errb bytes.Buffer
+	if err := run([]string{"init", dir, "--apply"}, &out, &errb); err != nil {
+		t.Fatalf("init --apply: %v (%s)", err, errb.String())
+	}
+	fillPlaceholders(t, dir)
+
+	hub, err := os.ReadFile(filepath.Join(dir, "AGENTS.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(hub), "## AI attribution") || !strings.Contains(string(hub), "Co-Authored-By") {
+		t.Fatalf("suppressed repo hub should carry the no-attribution directive:\n%s", hub)
+	}
+
+	// Alter the directive inside the managed region → drift; --fix restores it.
+	region, ok := standard.ManagedRegion(hub)
+	if !ok {
+		t.Fatal("hub should have a managed region")
+	}
+	drifted := strings.Replace(string(hub), string(region),
+		strings.Replace(string(region), "## AI attribution", "## Gone", 1), 1)
+	if err := os.WriteFile(filepath.Join(dir, "AGENTS.md"), []byte(drifted), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	out.Reset()
+	errb.Reset()
+	if code := exitCodeOf(t, run([]string{"check", dir}, &out, &errb)); code != exitDrift {
+		t.Fatalf("expected drift when the attribution directive is altered, got %d\n%s", code, out.String())
+	}
+	if !strings.Contains(out.String(), "attribution directive") {
+		t.Fatalf("drift should name the attribution directive, got: %s", out.String())
+	}
+	out.Reset()
+	errb.Reset()
+	if err := run([]string{"check", dir, "--fix"}, &out, &errb); err != nil {
+		t.Fatalf("--fix should restore the directive and exit 0, got %v\n%s", err, out.String())
+	}
+	hub2, _ := os.ReadFile(filepath.Join(dir, "AGENTS.md"))
+	if !strings.Contains(string(hub2), "## AI attribution") {
+		t.Fatalf("--fix should have restored the directive:\n%s", hub2)
 	}
 }

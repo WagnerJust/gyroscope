@@ -12,6 +12,7 @@ import (
 
 	"github.com/WagnerJust/gyroscope/internal/archive"
 	"github.com/WagnerJust/gyroscope/internal/config"
+	"github.com/WagnerJust/gyroscope/internal/enforce"
 	"github.com/WagnerJust/gyroscope/internal/fsutil"
 	"github.com/WagnerJust/gyroscope/internal/persona"
 	"github.com/WagnerJust/gyroscope/internal/standard"
@@ -98,6 +99,12 @@ func newCheckCmd(stdout io.Writer) *cobra.Command {
 					if moved > 0 {
 						fmt.Fprintf(stdout, "archived %d completed item(s) to DONE.md\n", moved)
 					}
+				}
+
+				// Suppress AI attribution when configured (enforce.aiAttribution=false):
+				// converge includeCoAuthoredBy:false into .claude/settings.json.
+				if err := applyAttribution(stdout, abs, cfg); err != nil {
+					return err
 				}
 			}
 
@@ -265,6 +272,13 @@ func checkRepo(repoDir string, cfg config.Config) (problems, notes []string, err
 					problems = append(problems, "AGENTS.md: personas directive missing or altered (run `gyroscope init`)")
 				}
 			}
+
+			// 7c. When AI attribution is suppressed, the managed region carries the
+			// standing no-attribution directive — the cross-harness (prompt-injection)
+			// half of the toggle, for harnesses without a native co-author setting.
+			if d := standard.AttributionDirective(cfg); d != "" && !strings.Contains(string(region), d) {
+				problems = append(problems, "AGENTS.md: AI-attribution directive missing or altered (run `gyroscope init`)")
+			}
 		}
 	}
 
@@ -392,7 +406,71 @@ func checkRepo(repoDir string, cfg config.Config) (problems, notes []string, err
 		}
 	}
 
+	// AI attribution: when suppression is configured (enforce.aiAttribution=false)
+	// and the Claude adapter is on, .claude/settings.json must carry
+	// includeCoAuthoredBy:false — the native lever that drops the co-author trailer /
+	// generated-by line. Absent or true is drift; `check --fix` sets it. gyroscope
+	// manages the key only under suppression, so an attribution-on repo is never
+	// checked for it.
+	if cfg.Enforce.Claude && !cfg.Enforce.AIAttribution {
+		v, present, err := enforce.CoAuthoredBy(repoDir)
+		if err != nil {
+			return nil, nil, err
+		}
+		if !present || v {
+			problems = append(problems, ".claude/settings.json: AI attribution suppressed (enforce.aiAttribution=false) but includeCoAuthoredBy is not false (run `gyroscope check --fix`)")
+		}
+	}
+
+	// Ship-to-team note (soft, never drift): when the Claude adapter is on but the
+	// repo gitignores `.claude/`, the SessionStart hook (and, with personas on, the
+	// `.claude/agents/` mirror) are version-control-invisible — a teammate who clones
+	// gets the tracked docs but no auto-injection and no dispatchable subagents, so
+	// the "self-enforcing, ships to the team" promise silently breaks. Advise a
+	// targeted `!`-negation. Advisory only: gitignoring `.claude/` is a legitimate
+	// choice, so this is a note, not nonconformance.
+	if cfg.Enforce.Claude && claudeShipBlocked(repoDir) {
+		msg := ".gitignore: `.claude/` is ignored, so the SessionStart hook won't ship to teammates"
+		neg := "add `!.claude/settings.json`"
+		if cfg.Spokes.Personas == config.PersonaOn {
+			msg += " (nor the `.claude/agents/` persona mirror)"
+			neg += " and `!.claude/agents/`"
+		}
+		notes = append(notes, msg+" — "+neg+" after the `.claude/` line to commit the enforcement (keep `.claude/settings.local.json` ignored)")
+	}
+
 	return problems, notes, nil
+}
+
+// claudeShipBlocked reports whether repoDir's root .gitignore would keep gyroscope's
+// Claude enforcement out of version control — it ignores `.claude/` (blanket) with no
+// `!`-negation re-including the hook. It is a deliberately small heuristic parse (no
+// git dependency): it recognizes a blanket `.claude` / `.claude/` ignore and honors a
+// negation for the hook path or for all of `.claude/`. Good enough for a soft note —
+// the negation it advises makes the note go away. Nested/edge .gitignore forms may
+// slip past; that only costs a missed advisory, never a wrong hard failure.
+func claudeShipBlocked(repoDir string) bool {
+	b, err := os.ReadFile(filepath.Join(repoDir, ".gitignore"))
+	if err != nil {
+		return false
+	}
+	ignores, negated := false, false
+	for _, ln := range strings.Split(string(b), "\n") {
+		t := strings.TrimSpace(ln)
+		if t == "" || strings.HasPrefix(t, "#") {
+			continue
+		}
+		switch strings.TrimPrefix(t, "/") {
+		case ".claude", ".claude/", ".claude/*", ".claude/**":
+			ignores = true
+		}
+		switch t {
+		case "!.claude", "!.claude/", "!/.claude", "!/.claude/",
+			"!.claude/settings.json", "!/.claude/settings.json":
+			negated = true
+		}
+	}
+	return ignores && !negated
 }
 
 // routesSection returns the trimmed body of the hub's `## Routes` section — the
