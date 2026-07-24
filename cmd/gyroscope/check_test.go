@@ -336,6 +336,69 @@ func TestCheckRegistersPersonasForOpenCodeAndCodex(t *testing.T) {
 	}
 }
 
+// PI has no native subagent registry, so persona parity is a generated extension
+// that registers a subagent tool per persona. With PI enabled and personas on, init
+// writes .pi/extensions/gyroscope-personas.ts, check verifies it, and removing it is
+// drift that --fix restores.
+func TestCheckRegistersPersonasForPI(t *testing.T) {
+	dir := t.TempDir()
+	cfg := `{"spokes":{"personas":"on"},"enforce":{"claude":true,"pi":true}}`
+	if err := os.WriteFile(filepath.Join(dir, "gyroscope.json"), []byte(cfg), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(filepath.Join(dir, "docs", "agents"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "docs", "agents", "backend-architect.md"), []byte(mirrorPersona), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	var out, errb bytes.Buffer
+	if err := run([]string{"init", dir, "--apply"}, &out, &errb); err != nil {
+		t.Fatalf("init --apply: %v (%s)", err, errb.String())
+	}
+	fillPlaceholders(t, dir)
+
+	ext := filepath.Join(dir, ".pi", "extensions", "gyroscope-personas.ts")
+	b, err := os.ReadFile(ext)
+	if err != nil {
+		t.Fatalf("expected PI persona extension: %v", err)
+	}
+	if !strings.Contains(string(b), "pi.registerTool(") || !strings.Contains(string(b), `"name": "backend-architect"`) {
+		t.Fatalf("PI extension does not register the persona as a tool:\n%s", b)
+	}
+
+	out.Reset()
+	errb.Reset()
+	if err := run([]string{"check", dir}, &out, &errb); err != nil {
+		t.Fatalf("check should pass with the PI extension present, got %v\n%s", err, out.String())
+	}
+
+	// Remove it → drift.
+	if err := os.Remove(ext); err != nil {
+		t.Fatal(err)
+	}
+	out.Reset()
+	errb.Reset()
+	if code := exitCodeOf(t, run([]string{"check", dir}, &out, &errb)); code != exitDrift {
+		t.Fatalf("missing PI persona extension should drift, got code %d", code)
+	}
+	if !strings.Contains(out.String(), "gyroscope-personas.ts") {
+		t.Fatalf("drift should name the PI persona extension, got: %s", out.String())
+	}
+
+	// --fix restores it.
+	out.Reset()
+	errb.Reset()
+	if err := run([]string{"check", "--fix", dir}, &out, &errb); err != nil {
+		t.Fatalf("check --fix: %v\n%s", err, out.String())
+	}
+	out.Reset()
+	errb.Reset()
+	if err := run([]string{"check", dir}, &out, &errb); err != nil {
+		t.Fatalf("check should pass after --fix restored the PI extension, got %v\n%s", err, out.String())
+	}
+}
+
 func TestCheckOnStateRequiresPersonaFile(t *testing.T) {
 	dir := initAndFill(t)
 	var out, errb bytes.Buffer

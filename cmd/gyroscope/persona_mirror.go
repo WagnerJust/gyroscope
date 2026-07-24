@@ -33,7 +33,9 @@ func personaTargets(cfg config.Config) []persona.Target {
 // planPersonaMirrors returns the persona mirrors init would write for repoDir —
 // the union across every enabled harness registry. Sharing personaTargets + PlanFor
 // keeps init's dry-run listing, init --apply, and check's verification in agreement
-// about which personas register where.
+// about which personas register where. PI is appended specially: it has no native
+// file registry, so its parity is a single generated extension (one file for all
+// personas), not one file per persona (ADR 0006/0014).
 func planPersonaMirrors(repoDir string, cfg config.Config) ([]persona.Mirror, error) {
 	var all []persona.Mirror
 	for _, t := range personaTargets(cfg) {
@@ -42,6 +44,15 @@ func planPersonaMirrors(repoDir string, cfg config.Config) ([]persona.Mirror, er
 			return nil, err
 		}
 		all = append(all, ms...)
+	}
+	if cfg.Spokes.Personas == config.PersonaOn && cfg.Enforce.PI {
+		m, ok, err := persona.PIExtensionMirror(repoDir)
+		if err != nil {
+			return nil, err
+		}
+		if ok {
+			all = append(all, m)
+		}
 	}
 	return all, nil
 }
