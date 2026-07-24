@@ -257,6 +257,85 @@ func TestCheckDriftsWhenPIExtensionMissing(t *testing.T) {
 	}
 }
 
+// A valid persona (frontmatter name + description + body) for the mirror tests.
+const mirrorPersona = "---\n" +
+	"name: backend-architect\n" +
+	`description: Use for "design" work, or review.` + "\n" +
+	"tools: Read, Grep\n" +
+	"---\n\n# Backend Architect\n\nYou design things.\n"
+
+// With OpenCode and Codex enabled alongside Claude, init registers each persona in
+// ALL THREE native subagent registries (byte-copy for Claude, re-encoded for the
+// others), check verifies them, and a removed mirror is drift.
+func TestCheckRegistersPersonasForOpenCodeAndCodex(t *testing.T) {
+	dir := t.TempDir()
+	cfg := `{"spokes":{"personas":"on"},"enforce":{"claude":true,"opencode":true,"codex":true}}`
+	if err := os.WriteFile(filepath.Join(dir, "gyroscope.json"), []byte(cfg), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	// The persona must exist before init so init mirrors it into every registry.
+	if err := os.MkdirAll(filepath.Join(dir, "docs", "agents"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "docs", "agents", "backend-architect.md"), []byte(mirrorPersona), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	var out, errb bytes.Buffer
+	if err := run([]string{"init", dir, "--apply"}, &out, &errb); err != nil {
+		t.Fatalf("init --apply: %v (%s)", err, errb.String())
+	}
+	fillPlaceholders(t, dir)
+
+	claude := filepath.Join(dir, ".claude", "agents", "backend-architect.md")
+	opencode := filepath.Join(dir, ".opencode", "agents", "backend-architect.md")
+	codex := filepath.Join(dir, ".codex", "agents", "backend-architect.toml")
+	for _, p := range []string{claude, opencode, codex} {
+		if _, err := os.Stat(p); err != nil {
+			t.Fatalf("expected registered mirror %s: %v", p, err)
+		}
+	}
+	// Spot-check the re-encoded formats.
+	if b, _ := os.ReadFile(opencode); !strings.Contains(string(b), "mode: subagent") {
+		t.Errorf("opencode mirror missing `mode: subagent`:\n%s", b)
+	}
+	if b, _ := os.ReadFile(codex); !strings.Contains(string(b), "developer_instructions") {
+		t.Errorf("codex mirror missing developer_instructions:\n%s", b)
+	}
+
+	// Conformant with all three present.
+	out.Reset()
+	errb.Reset()
+	if err := run([]string{"check", dir}, &out, &errb); err != nil {
+		t.Fatalf("check should pass with all mirrors present, got %v\n%s", err, out.String())
+	}
+
+	// Removing the OpenCode mirror is drift naming .opencode.
+	if err := os.Remove(opencode); err != nil {
+		t.Fatal(err)
+	}
+	out.Reset()
+	errb.Reset()
+	err := run([]string{"check", dir}, &out, &errb)
+	if code := exitCodeOf(t, err); code != exitDrift {
+		t.Fatalf("missing opencode mirror should drift, got code %d (%v)", code, err)
+	}
+	if !strings.Contains(out.String(), ".opencode") {
+		t.Fatalf("drift should name the opencode mirror, got: %s", out.String())
+	}
+
+	// check --fix re-registers it → conformant again.
+	out.Reset()
+	errb.Reset()
+	if err := run([]string{"check", "--fix", dir}, &out, &errb); err != nil {
+		t.Fatalf("check --fix: %v\n%s", err, out.String())
+	}
+	out.Reset()
+	errb.Reset()
+	if err := run([]string{"check", dir}, &out, &errb); err != nil {
+		t.Fatalf("check should pass after --fix re-mirrored, got %v\n%s", err, out.String())
+	}
+}
+
 func TestCheckOnStateRequiresPersonaFile(t *testing.T) {
 	dir := initAndFill(t)
 	var out, errb bytes.Buffer

@@ -28,6 +28,13 @@ type Config struct {
 type EnforceSet struct {
 	Claude bool `json:"claude"`
 	PI     bool `json:"pi"`
+	// OpenCode and Codex are opt-in (default false), like PI: both read AGENTS.md
+	// natively (no hook to install), so enabling them wires the parts that are NOT
+	// free — mirroring docs/agents/ personas into each tool's native subagent
+	// registry (.opencode/agents/, .codex/agents/) and, for Codex, the
+	// commit_attribution setting. Off means gyroscope writes nothing tool-specific.
+	OpenCode bool `json:"opencode"`
+	Codex    bool `json:"codex"`
 	// AIAttribution controls whether AI agents may sign their work — the
 	// `Co-Authored-By` trailer / "Generated with …" footer on commits and PRs/MRs.
 	// Default true (unchanged behavior). Set false to suppress it repo-wide: the
@@ -120,7 +127,7 @@ func Default() Config {
 			Context: true, Agents: true, ADR: true, Personas: PersonaUnknown, Local: true,
 			Contributing: true, PRTemplate: true, CommitConvention: true, State: true,
 		},
-		Enforce: EnforceSet{Claude: true, PI: false, AIAttribution: true},
+		Enforce: EnforceSet{Claude: true, PI: false, OpenCode: false, Codex: false, AIAttribution: true},
 	}
 }
 

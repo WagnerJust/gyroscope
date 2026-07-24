@@ -339,28 +339,27 @@ func checkRepo(repoDir string, cfg config.Config) (problems, notes []string, err
 			problems = append(problems, "docs/agents/: personas state is `on` but no persona files present (only README)")
 		}
 
-		// 8b. Registration: when the persona mirror is gated (personas on AND the
-		// Claude adapter enabled), each canonical persona must be mirrored into
-		// .claude/agents/<name>.md, byte-equal to its docs/agents/ source — that is
-		// what makes Claude register it as a dispatchable subagent (ADR 0010). A
-		// missing or drifted mirror is nonconformance; `check --fix` re-mirrors above.
-		if personaMirrorGated(cfg) {
-			mirrors, err := persona.Plan(repoDir)
+		// 8b. Registration: for each enabled harness registry (personas on AND that
+		// adapter enabled), every canonical persona must be mirrored into that
+		// harness's subagent file — byte-equal to what gyroscope would re-encode from
+		// its docs/agents/ source — which is what makes the harness register it as a
+		// dispatchable subagent (ADR 0010, extended per-harness in ADR 0014). A missing
+		// or drifted mirror is nonconformance; `check --fix` re-mirrors above.
+		mirrors, err := planPersonaMirrors(repoDir, cfg)
+		if err != nil {
+			return nil, nil, err
+		}
+		for _, m := range mirrors {
+			got, err := os.ReadFile(filepath.Join(repoDir, m.Dest))
+			if os.IsNotExist(err) {
+				problems = append(problems, fmt.Sprintf("%s: persona not registered — mirror missing (run `gyroscope init --apply` or `check --fix`)", m.Dest))
+				continue
+			}
 			if err != nil {
 				return nil, nil, err
 			}
-			for _, m := range mirrors {
-				got, err := os.ReadFile(filepath.Join(repoDir, m.Dest))
-				if os.IsNotExist(err) {
-					problems = append(problems, fmt.Sprintf("%s: persona not registered — mirror missing (run `gyroscope init --apply` or `check --fix`)", m.Dest))
-					continue
-				}
-				if err != nil {
-					return nil, nil, err
-				}
-				if !bytes.Equal(got, m.Bytes) {
-					problems = append(problems, fmt.Sprintf("%s: persona mirror differs from its docs/agents/ source (run `check --fix` to re-mirror)", m.Dest))
-				}
+			if !bytes.Equal(got, m.Bytes) {
+				problems = append(problems, fmt.Sprintf("%s: persona mirror differs from its docs/agents/ source (run `check --fix` to re-mirror)", m.Dest))
 			}
 		}
 	}

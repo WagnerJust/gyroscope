@@ -32,13 +32,21 @@ type Mirror struct {
 	Bytes []byte
 }
 
-// Plan lists the mirror copies gyroscope would write for repoDir: one per VALID
-// persona under docs/agents/ — a *.md file (other than README.md) whose YAML
-// frontmatter carries a `name:`. The destination filename is that frontmatter
-// name, so `.claude/agents/<name>.md` matches the registered subagent type even
-// when the source file is named differently. A missing docs/agents/ yields an
-// empty plan (no personas to register), not an error.
+// Plan lists the Claude mirror copies gyroscope would write for repoDir — the
+// back-compatible default target. See PlanFor for the per-harness generalization.
 func Plan(repoDir string) ([]Mirror, error) {
+	return PlanFor(repoDir, Claude)
+}
+
+// PlanFor lists the mirror files gyroscope would write for repoDir to register its
+// personas as subagents in target t's registry: one per VALID persona under
+// docs/agents/ — a *.md file (other than README.md) whose YAML frontmatter carries
+// a `name:`. The destination path and encoding come from t, so the SAME canonical
+// source registers into each harness's own format. The destination filename is the
+// frontmatter name, so it matches the registered subagent id even when the source
+// file is named differently. A missing docs/agents/ yields an empty plan (no
+// personas to register), not an error.
+func PlanFor(repoDir string, t Target) ([]Mirror, error) {
 	agentsDir := filepath.Join(repoDir, "docs", "agents")
 	entries, err := os.ReadDir(agentsDir)
 	if os.IsNotExist(err) {
@@ -56,52 +64,19 @@ func Plan(repoDir string) ([]Mirror, error) {
 		if err != nil {
 			return nil, err
 		}
-		name, ok := frontmatterName(b)
+		p, ok := parse(b)
 		if !ok {
-			// Not a valid persona (no `name:` frontmatter): skip it. Only files
-			// Claude can register as a subagent get mirrored.
+			// Not a valid persona (no `name:` frontmatter): skip it. Only files a
+			// harness can register as a subagent get mirrored.
 			continue
 		}
 		mirrors = append(mirrors, Mirror{
 			Src:   filepath.Join("docs", "agents", e.Name()),
-			Dest:  filepath.Join(".claude", "agents", name+".md"),
-			Bytes: b,
+			Dest:  t.dest(p.Name),
+			Bytes: t.render(p),
 		})
 	}
 	return mirrors, nil
-}
-
-// frontmatterName extracts the `name:` value from a persona's YAML frontmatter —
-// the block delimited by a leading `---` line and the next `---` line. It returns
-// ("", false) when there is no frontmatter or no `name:` key, which marks the file
-// as not a valid persona. Only the small subset of YAML personas actually use is
-// parsed (a `key: value` line); no YAML dependency is pulled in.
-func frontmatterName(b []byte) (string, bool) {
-	s := string(b)
-	// Frontmatter must be the first thing in the file.
-	if !strings.HasPrefix(s, "---\n") && !strings.HasPrefix(s, "---\r\n") {
-		return "", false
-	}
-	lines := strings.Split(s, "\n")
-	// lines[0] is the opening "---"; scan until the closing "---".
-	for _, ln := range lines[1:] {
-		t := strings.TrimRight(ln, "\r")
-		if t == "---" {
-			break // end of frontmatter, no name found
-		}
-		key, val, ok := strings.Cut(t, ":")
-		if !ok {
-			continue
-		}
-		if strings.TrimSpace(key) == "name" {
-			name := strings.TrimSpace(val)
-			if name == "" {
-				return "", false
-			}
-			return name, true
-		}
-	}
-	return "", false
 }
 
 // Copy writes each planned mirror to repoDir, creating .claude/agents/ as needed,
