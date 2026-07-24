@@ -443,6 +443,19 @@ func checkRepo(repoDir string, cfg config.Config) (problems, notes []string, err
 		}
 	}
 
+	// Codex's native equivalent: when suppression is configured and the Codex adapter
+	// is on, .codex/config.toml must carry commit_attribution="" (the kill-switch for
+	// Codex's git co-author trailer). Absent or non-empty is drift; `check --fix` sets it.
+	if cfg.Enforce.Codex && !cfg.Enforce.AIAttribution {
+		val, present, err := enforce.CodexCommitAttribution(repoDir)
+		if err != nil {
+			return nil, nil, err
+		}
+		if !present || val != "" {
+			problems = append(problems, `.codex/config.toml: AI attribution suppressed (enforce.aiAttribution=false) but commit_attribution is not "" (run `+"`gyroscope check --fix`)")
+		}
+	}
+
 	// Ship-to-team note (soft, never drift): when the Claude adapter is on but the
 	// repo gitignores `.claude/`, the SessionStart hook (and, with personas on, the
 	// `.claude/agents/` mirror) are version-control-invisible — a teammate who clones

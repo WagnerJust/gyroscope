@@ -749,6 +749,48 @@ func TestAIAttributionSuppression(t *testing.T) {
 	assertCoAuthored(false)
 }
 
+// With the Codex adapter on and attribution suppressed, init writes
+// commit_attribution="" into .codex/config.toml, check flags a non-empty value as
+// drift, and --fix converges it back — Codex's native attribution kill-switch.
+func TestAIAttributionSuppressionCodex(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "gyroscope.json"), []byte(`{"enforce":{"codex":true,"aiAttribution":false}}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	var out, errb bytes.Buffer
+	if err := run([]string{"init", dir, "--apply"}, &out, &errb); err != nil {
+		t.Fatalf("init --apply: %v (%s)", err, errb.String())
+	}
+	fillPlaceholders(t, dir)
+
+	if val, present, err := enforce.CodexCommitAttribution(dir); err != nil || !present || val != "" {
+		t.Fatalf("init should suppress: val=%q present=%v err=%v", val, present, err)
+	}
+
+	// A non-empty value → drift naming the key.
+	if err := os.WriteFile(filepath.Join(dir, ".codex", "config.toml"), []byte(`commit_attribution = "Codex <noreply@openai.com>"`+"\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	out.Reset()
+	errb.Reset()
+	if code := exitCodeOf(t, run([]string{"check", dir}, &out, &errb)); code != exitDrift {
+		t.Fatalf("expected drift when commit_attribution is non-empty under suppression, got code %d\n%s", code, out.String())
+	}
+	if !strings.Contains(out.String(), "commit_attribution") {
+		t.Fatalf("drift should name commit_attribution, got: %s", out.String())
+	}
+
+	// --fix converges it back to "".
+	out.Reset()
+	errb.Reset()
+	if err := run([]string{"check", dir, "--fix"}, &out, &errb); err != nil {
+		t.Fatalf("--fix should re-suppress and exit 0, got %v\n%s", err, out.String())
+	}
+	if val, _, _ := enforce.CodexCommitAttribution(dir); val != "" {
+		t.Fatalf("--fix should reset commit_attribution to empty, got %q", val)
+	}
+}
+
 // The default (attribution on) never writes the key — gyroscope leaves Claude's own
 // default in place and check does not police it.
 func TestAIAttributionDefaultLeavesKeyUnmanaged(t *testing.T) {

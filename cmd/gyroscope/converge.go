@@ -210,22 +210,36 @@ func applyConverge(stdout io.Writer, abs string, items []convergeItem, adapters 
 	return skipped, nil
 }
 
-// applyAttribution enforces the Claude-native half of the AI-attribution toggle: when
-// the Claude adapter is on and attribution is suppressed (enforce.aiAttribution=false),
-// write includeCoAuthoredBy:false into .claude/settings.json, preserving other settings.
-// gyroscope touches the key ONLY to suppress; a repo that leaves attribution on (the
-// default) never has the key written, so Claude's own default stands. Shared by
-// `init --apply` and `check --fix` so detect and converge stay symmetric.
+// applyAttribution enforces the native half of the AI-attribution toggle per
+// harness: when attribution is suppressed (enforce.aiAttribution=false), write each
+// enabled harness's native kill-switch, preserving all other content — Claude's
+// includeCoAuthoredBy:false in .claude/settings.json, and Codex's
+// commit_attribution="" in .codex/config.toml. gyroscope touches these keys ONLY to
+// suppress; a repo that leaves attribution on (the default) never has them written,
+// so each tool's own default stands. (OpenCode has no attribution setting; it relies
+// on the cross-harness hub directive alone.) Shared by `init --apply` and
+// `check --fix` so detect and converge stay symmetric.
 func applyAttribution(stdout io.Writer, abs string, cfg config.Config) error {
-	if !cfg.Enforce.Claude || cfg.Enforce.AIAttribution {
+	if cfg.Enforce.AIAttribution {
 		return nil
 	}
-	changed, err := enforce.SetCoAuthoredBy(abs, false)
-	if err != nil {
-		return errCannotRun(err)
+	if cfg.Enforce.Claude {
+		changed, err := enforce.SetCoAuthoredBy(abs, false)
+		if err != nil {
+			return errCannotRun(err)
+		}
+		if changed {
+			fmt.Fprintln(stdout, "set .claude/settings.json includeCoAuthoredBy=false (AI attribution suppressed)")
+		}
 	}
-	if changed {
-		fmt.Fprintln(stdout, "set .claude/settings.json includeCoAuthoredBy=false (AI attribution suppressed)")
+	if cfg.Enforce.Codex {
+		changed, err := enforce.SetCodexCommitAttributionEmpty(abs)
+		if err != nil {
+			return errCannotRun(err)
+		}
+		if changed {
+			fmt.Fprintln(stdout, `set .codex/config.toml commit_attribution="" (AI attribution suppressed)`)
+		}
 	}
 	return nil
 }
