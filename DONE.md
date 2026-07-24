@@ -375,3 +375,13 @@
   verified byte-for-byte). Tool-restriction mapping (`--tools`) is a documented gap (Claude names
   don't map to PI's). Confirmed against PI's extension API + headless flags before building. Full
   harness matrix (Claude/PI/OpenCode/Codex) now reaches persona-dispatch parity when its adapter is on.
+- [x] **Persona tool-allowlist carries through (tool-fidelity follow-up; ADR 0015 update 2026-07-24).**
+  Closed the gap the parity build flagged: the persona `tools:` allowlist is now mapped onto each
+  harness's native restriction model, verified against each tool's docs/source first. OpenCode — a
+  per-tool `permission:` block (allow the persona's tools, `deny` the rest of the mappable set; `deny`
+  is a hard block). PI — `--tools` with the mapped built-in names (Read→read, Glob→find, …); only
+  verified names are baked, so an unknown name can never fail the run; WebFetch/WebSearch dropped (no
+  PI built-in). Codex — `sandbox_mode = "read-only"` when a persona touches no mutating/network tool,
+  else left at default (only tightens, never loosens; Codex has no per-tool allowlist). parse() now
+  captures the allowlist; maps live in `internal/persona/toolmap.go`. Residual low-priority gaps
+  (web tools, Codex coarseness, verify-on-target) tracked in TODO. TDD.

@@ -45,6 +45,14 @@ response. Key choices:
   do not map cleanly, and a wrong name would fail the whole run. The subagent runs
   with PI's default toolset; the extension header says so.
 
+  **Update (2026-07-24):** this gap is now mostly closed. The persona `tools:`
+  allowlist IS mapped to PI's verified built-in names (Read→read, Glob→find, …) and
+  passed via `--tools`; only names with no PI built-in (WebFetch, WebSearch) are
+  dropped. Because only verified names are ever emitted, the "wrong name fails the
+  run" risk does not arise. The same follow-up maps allowlists onto OpenCode's
+  per-tool `permission` block (faithful) and approximates them with Codex's coarse
+  `sandbox_mode` (read-only when the persona touches no mutating/network tool).
+
 ## Consequences
 
 - PI reaches persona-*dispatch* parity: each authored persona becomes a tool the
@@ -54,7 +62,9 @@ response. Key choices:
   correctness depends on PI's extension API (`registerTool`) and headless flags
   (`-p`, `--no-session`, `--append-system-prompt`) staying stable. Those are pinned to
   what PI's repo documents and its reference `subagent` example uses as of this ADR.
-- Tool-restriction fidelity is the known gap; if a Claude→PI tool-name map is ever
-  wanted, it slots into the generator without changing this shape.
+- Tool-restriction fidelity is now carried through where each harness supports it
+  (see the 2026-07-24 update above): faithful for OpenCode and PI's built-in tools,
+  coarse for Codex. Residual gaps: PI/OpenCode have no built-in for some Claude web
+  tools, and Codex is sandbox-mode-only — tracked as a low-priority follow-up.
 - Parity is still gated and opt-in (`enforce.pi` + `personas == on`), consistent with
   ADR 0002/0006 — a repo not driven by PI generates nothing.

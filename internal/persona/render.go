@@ -11,8 +11,9 @@ import (
 // differs (OpenCode, Codex), so the binary can re-encode rather than byte-copy.
 type Persona struct {
 	Name        string
-	Description string // raw text after `description:` (verbatim; may contain quotes)
-	Body        string // everything after the closing frontmatter `---`
+	Description string   // raw text after `description:` (verbatim; may contain quotes)
+	Tools       []string // the `tools:` allowlist (Claude tool names), nil when the field is absent
+	Body        string   // everything after the closing frontmatter `---`
 	Raw         []byte
 }
 
@@ -27,6 +28,7 @@ func parse(b []byte) (Persona, bool) {
 	}
 	lines := strings.Split(s, "\n")
 	var name, desc string
+	var tools []string
 	end := -1
 	for i := 1; i < len(lines); i++ {
 		t := strings.TrimRight(lines[i], "\r")
@@ -43,6 +45,8 @@ func parse(b []byte) (Persona, bool) {
 			name = strings.TrimSpace(val)
 		case "description":
 			desc = strings.TrimSpace(val)
+		case "tools":
+			tools = splitList(val)
 		}
 	}
 	if end == -1 || name == "" {
@@ -51,9 +55,23 @@ func parse(b []byte) (Persona, bool) {
 	return Persona{
 		Name:        name,
 		Description: desc,
+		Tools:       tools,
 		Body:        strings.Join(lines[end+1:], "\n"),
 		Raw:         b,
 	}, true
+}
+
+// splitList parses a comma-separated allowlist ("Read, Grep, Bash") into trimmed,
+// non-empty entries. Returns nil for an empty value so an absent/blank `tools:` is
+// distinguishable from a real allowlist.
+func splitList(val string) []string {
+	var out []string
+	for _, p := range strings.Split(val, ",") {
+		if t := strings.TrimSpace(p); t != "" {
+			out = append(out, t)
+		}
+	}
+	return out
 }
 
 // Target is one harness's subagent registry: where a persona registers, and how
@@ -101,6 +119,7 @@ func renderOpenCode(p Persona) []byte {
 	b.WriteString(p.Description)
 	b.WriteByte('\n')
 	b.WriteString("mode: subagent\n")
+	b.WriteString(openCodePermissionBlock(p.Tools))
 	b.WriteString("---\n")
 	b.WriteString(p.Body)
 	return []byte(b.String())
@@ -117,6 +136,11 @@ func renderCodex(p Persona) []byte {
 	b.WriteString("description = ")
 	b.WriteString(tomlBasic(p.Description))
 	b.WriteByte('\n')
+	if mode := codexSandboxMode(p.Tools); mode != "" {
+		b.WriteString("sandbox_mode = ")
+		b.WriteString(tomlBasic(mode))
+		b.WriteByte('\n')
+	}
 	b.WriteString("developer_instructions = ")
 	b.WriteString(tomlMultiline(p.Body))
 	b.WriteByte('\n')

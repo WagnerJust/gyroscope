@@ -64,6 +64,28 @@ func TestPIExtensionMirror_RegistersToolPerPersona(t *testing.T) {
 	}
 }
 
+func TestPIExtension_BakesMappedToolsAndPassesToTools(t *testing.T) {
+	dir := t.TempDir()
+	// A persona whose allowlist mixes mappable and unmappable (WebFetch) tools.
+	writeFile(t, dir, "docs/agents/scout.md", "---\nname: scout\ndescription: d.\ntools: Read, Glob, WebFetch\n---\n\nBody.\n")
+	m, ok, err := PIExtensionMirror(dir)
+	if err != nil || !ok {
+		t.Fatalf("ok=%v err=%v", ok, err)
+	}
+	src := string(m.Bytes)
+	// Baked tools are the mapped PI names, WebFetch dropped.
+	if !strings.Contains(src, `"tools": [`) || !strings.Contains(src, `"read"`) || !strings.Contains(src, `"find"`) {
+		t.Errorf("expected baked mapped tools read/find:\n%s", src)
+	}
+	if strings.Contains(src, "webfetch") {
+		t.Errorf("unmappable WebFetch must be dropped, not passed to --tools:\n%s", src)
+	}
+	// The extension passes them via --tools guarded by a length check.
+	if !strings.Contains(src, `"--tools"`) {
+		t.Errorf("extension should pass --tools when tools are present:\n%s", src)
+	}
+}
+
 // The baked extension must be deterministic (byte-stable) so check can verify it.
 func TestPIExtensionMirror_Deterministic(t *testing.T) {
 	dir := t.TempDir()

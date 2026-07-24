@@ -113,6 +113,61 @@ func TestRenderCodex_IsValidTOMLWithEscaping(t *testing.T) {
 	}
 }
 
+const readOnlyPersona = "---\nname: ro\ndescription: read only.\ntools: Read, Grep\n---\n\nBody.\n"
+const noToolsPersona = "---\nname: nt\ndescription: unrestricted.\n---\n\nBody.\n"
+
+func TestRenderOpenCode_AllowlistBecomesPermissionBlock(t *testing.T) {
+	p, _ := parse([]byte(readOnlyPersona))
+	got := string(OpenCode.render(p))
+	if !strings.Contains(got, "permission:") {
+		t.Fatalf("expected a permission block for a restricted persona:\n%s", got)
+	}
+	for _, want := range []string{"read: allow", "grep: allow", "write: deny", "edit: deny", "bash: deny", "glob: deny", "webfetch: deny", "websearch: deny"} {
+		if !strings.Contains(got, want) {
+			t.Errorf("permission block missing %q:\n%s", want, got)
+		}
+	}
+}
+
+func TestRenderOpenCode_NoAllowlistNoPermissionBlock(t *testing.T) {
+	p, _ := parse([]byte(noToolsPersona))
+	if got := string(OpenCode.render(p)); strings.Contains(got, "permission:") {
+		t.Errorf("a persona with no tools: allowlist should be unrestricted (no permission block):\n%s", got)
+	}
+}
+
+func TestRenderCodex_ReadOnlyPersonaGetsSandboxMode(t *testing.T) {
+	ro, _ := parse([]byte(readOnlyPersona))
+	if got := string(Codex.render(ro)); !strings.Contains(got, `sandbox_mode = "read-only"`) {
+		t.Errorf("read-only persona should get sandbox_mode read-only:\n%s", got)
+	}
+	// personaWithQuotes carries Bash → must NOT be forced to read-only (only tighten).
+	rw, _ := parse([]byte(personaWithQuotes))
+	if got := string(Codex.render(rw)); strings.Contains(got, "sandbox_mode") {
+		t.Errorf("a persona with Bash must not get a forced sandbox_mode:\n%s", got)
+	}
+}
+
+func TestPiTools_MapsAndDropsUnmappable(t *testing.T) {
+	got := piTools([]string{"Read", "Glob", "WebFetch", "Bash", "Grep"})
+	want := []string{"read", "find", "bash", "grep"} // WebFetch dropped, Glob→find, order preserved
+	if strings.Join(got, ",") != strings.Join(want, ",") {
+		t.Errorf("piTools = %v, want %v", got, want)
+	}
+}
+
+func TestCodexSandboxMode(t *testing.T) {
+	if codexSandboxMode([]string{"Read", "Grep", "Glob"}) != "read-only" {
+		t.Error("read/grep/glob only should be read-only")
+	}
+	if codexSandboxMode([]string{"Read", "Bash"}) != "" {
+		t.Error("presence of Bash should leave the default (empty)")
+	}
+	if codexSandboxMode(nil) != "" {
+		t.Error("no allowlist should leave the default (empty)")
+	}
+}
+
 func TestTomlMultiline_NeutralizesTripleQuoteAndBackslash(t *testing.T) {
 	// A body that contains a literal """ and a backslash must not break the string.
 	out := tomlMultiline(`ends with a quote block """ and a path C:\x`)

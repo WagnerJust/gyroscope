@@ -21,10 +21,11 @@ const piPersonaExtensionPath = ".pi/extensions/gyroscope-personas.ts"
 // never re-parses YAML (no dual-implementation drift) — the single-parser rule that
 // also shapes the other harness mirrors (ADR 0010/0014).
 type piPersona struct {
-	Name        string `json:"name"`
-	Label       string `json:"label"`
-	Description string `json:"description"`
-	Prompt      string `json:"prompt"`
+	Name        string   `json:"name"`
+	Label       string   `json:"label"`
+	Description string   `json:"description"`
+	Tools       []string `json:"tools"` // mapped PI tool names; empty → PI default toolset
+	Prompt      string   `json:"prompt"`
 }
 
 // List returns every valid persona under repoDir/docs/agents/, parsed, in
@@ -87,10 +88,15 @@ func PIExtensionMirror(repoDir string) (Mirror, bool, error) {
 func renderPIExtension(ps []Persona) ([]byte, error) {
 	metas := make([]piPersona, 0, len(ps))
 	for _, p := range ps {
+		tools := piTools(p.Tools)
+		if tools == nil {
+			tools = []string{} // marshal to [] not null, so the extension can .length it
+		}
 		metas = append(metas, piPersona{
 			Name:        p.Name,
 			Label:       label(p.Name),
 			Description: p.Description,
+			Tools:       tools,
 			Prompt:      strings.TrimLeft(p.Body, "\n"),
 		})
 	}
@@ -122,16 +128,17 @@ func label(name string) string {
 // piExtensionTemplate is the managed PI persona extension. %s is the JSON array of
 // baked persona metadata. Each persona becomes a subagent tool whose execute()
 // spawns a fresh headless `pi -p` with the persona body as an appended system prompt
-// and returns its printed response. Tool restriction (the persona `tools:` field) is
-// intentionally NOT mapped to `--tools`: Claude tool names do not map cleanly onto
-// PI's, and a wrong name would fail the run — so the subagent runs with PI's default
-// toolset. That is a documented parity gap, not a silent one.
+// and returns its printed response. The persona's `tools:` allowlist is mapped to
+// PI's built-in tool names and passed via `--tools` (only verified names are baked,
+// so an unknown name can never fail the run); tools with no PI built-in — WebFetch,
+// WebSearch — are dropped (a documented, narrow gap). An empty list means the
+// subagent runs with PI's default toolset.
 const piExtensionTemplate = `// gyroscope-personas.ts — managed by gyroscope; do not edit by hand.
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
 import { spawn } from "node:child_process";
 
-interface Persona { name: string; label: string; description: string; prompt: string; }
+interface Persona { name: string; label: string; description: string; tools: string[]; prompt: string; }
 
 const PERSONAS: Persona[] = %s;
 
@@ -156,14 +163,11 @@ export default function (pi: ExtensionAPI) {
 			}),
 			async execute(_toolCallId, params, signal) {
 				const inv = piInvocation();
-				const args = [
-					...inv.args,
-					"-p",
-					"--no-session",
-					"--append-system-prompt",
-					persona.prompt,
-					"Task: " + params.task,
-				];
+				const args = [...inv.args, "-p", "--no-session"];
+				if (persona.tools && persona.tools.length > 0) {
+					args.push("--tools", persona.tools.join(","));
+				}
+				args.push("--append-system-prompt", persona.prompt, "Task: " + params.task);
 				const text = await new Promise<string>((resolve, reject) => {
 					const proc = spawn(inv.command, args, {
 						shell: false,
