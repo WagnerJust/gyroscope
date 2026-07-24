@@ -400,3 +400,22 @@
   nothing to build. Documented in ADR 0016 (with the first-match caveat: keep `.rules` pointing at the
   hub). Enforcement matrix now: active adapter for Claude/PI/Cursor; native auto-read for
   Zed/OpenCode/Codex; passive pointer for the rest.
+
+## Code-review persona preset (2026-07-24; ADR 0017)
+- [x] **`codeReview` preset — opt-in curated review-suite scaffold.** Resolved the toggle-vs-preset
+  question: a single `gyroscope.json` `codeReview` flag (default off) that REDIRECTS the persona flow
+  — the binary only records the flag (one config field, no templates; binary/skill split holds), the
+  `/gyroscope` skill scaffolds the bundle. SKILL.md now carries the canonical suite (distilled from
+  `~/Work/lajolla`): layer-aligned `*-reviewer.md` specialists (repo-tuned — a Go CLI gets
+  backend+security+cicd, drops web genres), `security-reviewer` always-on, a non-filtering
+  `synthesizer`, and the load-bearing `intent-verifier` that grounds findings against the repo's
+  decision record (ADRs/TODO/DONE/spokes), plus a `code-review` orchestrator runbook and a grounding
+  ADR recorded in the adopting repo. Reviewer personas are ordinary personas → register into every
+  enabled harness registry, policed by existing checks (no new enforcement surface). Complements a
+  generic runner (Claude `/code-review`); this supplies the repo's own reviewers + intent-grounding.
+- [x] **SKILL.md brought current with the harness-parity work.** The skill's persona-registration and
+  enforcement docs only mentioned `.claude/agents/` + PI context injection — stale after the parity
+  build. Updated: the register step now documents per-harness registries (Claude byte-copy;
+  OpenCode/Codex re-encode; PI personas extension) gated on `enforce.*` and the `tools:` carry-through;
+  the enforcement section now covers all toggles (claude/pi/opencode/codex/cursor/aiAttribution) with
+  Zed's native-read no-op noted — so the shipped features are discoverable through the skill.

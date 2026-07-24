@@ -123,6 +123,27 @@ func TestEnforceAbsentKeepsDefaults(t *testing.T) {
 	}
 }
 
+func TestCodeReviewDefaultOffAndOptIn(t *testing.T) {
+	if Default().CodeReview {
+		t.Fatal("codeReview should default off (opt-in preset)")
+	}
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "gyroscope.json"), []byte(`{"codeReview":true}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	cfg, err := Load(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !cfg.CodeReview {
+		t.Fatal("codeReview:true should load as true")
+	}
+	// The flag must not disturb other defaults.
+	if !cfg.Enforce.Claude || !cfg.Spokes.Context {
+		t.Fatal("codeReview flag should not alter other defaults")
+	}
+}
+
 func TestPersonasBoolBackCompat(t *testing.T) {
 	cases := map[string]PersonaState{
 		`{"spokes":{"personas":true}}`:  PersonaUnknown,

@@ -19,6 +19,14 @@ type Config struct {
 	// Custom lists extra spoke doc files beyond the built-in five. Absent means
 	// none; the writer skips any entry missing a Name or Dest.
 	Custom []CustomSpoke `json:"custom"`
+	// CodeReview is an opt-in persona PRESET (default false): instead of the
+	// from-scratch persona interview, the /gyroscope skill scaffolds a curated
+	// multi-persona code-review bundle — layer-aligned reviewer personas
+	// (repo-tuned), a synthesizer, an intent-verifier grounded against the repo's
+	// decision record, a code-review orchestrator runbook, and the grounding ADR.
+	// The binary only records the flag; the skill authors the content (binary/skill
+	// split). See ADR 0017.
+	CodeReview bool `json:"codeReview"`
 }
 
 // EnforceSet toggles which harness enforcement adapters init installs and check

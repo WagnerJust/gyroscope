@@ -194,13 +194,22 @@ Only once the reconcile is settled, run the wire/skip decision:
       - optional `tools:` / `model:`.
    d. Run `gyroscope agents set on`.
    e. Run `gyroscope init --apply` to **register** the personas: the binary mirrors
-      each valid `docs/agents/` persona byte-for-byte into `.claude/agents/<name>.md`
-      so Claude scans and dispatches them as subagents (gated on personas `on` +
-      the Claude adapter; see ADR 0010). Without this, the personas are authored and
-      hub-routed but never dispatchable. `docs/agents/` stays canonical — edit
-      personas there and re-run; never hand-edit the generated `.claude/agents/`
-      mirror. `gyroscope check` flags a missing or drifted mirror; `check --fix`
-      re-mirrors.
+      each valid `docs/agents/` persona into every enabled harness's native subagent
+      registry so it can be dispatched as a subagent (gated on personas `on` + that
+      harness's adapter). `docs/agents/` stays canonical — edit personas there and
+      re-run; never hand-edit a generated mirror. `gyroscope check` flags a missing
+      or drifted mirror; `check --fix` re-mirrors. Which registries are written
+      depends on the `enforce.*` toggles:
+      - **Claude** (`enforce.claude`, default on) → `.claude/agents/<name>.md`,
+        byte-for-byte (ADR 0010).
+      - **OpenCode** (`enforce.opencode`) → `.opencode/agents/<name>.md` and
+        **Codex** (`enforce.codex`) → `.codex/agents/<name>.toml`: re-encoded from the
+        same canonical source into each tool's format (ADR 0014).
+      - **PI** (`enforce.pi`) → `.pi/extensions/gyroscope-personas.ts`, a generated
+        extension registering each persona as a dispatchable subagent tool (ADR
+        0015). PI has no native registry, so this is runtime, not a file mirror.
+      A persona's `tools:` allowlist carries through to each (OpenCode `permission`,
+      PI `--tools`, Codex `sandbox_mode`) where the harness supports it.
 
 Persona-fit guidance for a Go/CLI backend repo:
 - code-reviewer templates → quality-review framing.
@@ -213,20 +222,78 @@ Persona-fit guidance for a Go/CLI backend repo:
 
 The binary never **authors** persona content — that is entirely this skill's job.
 The binary records the decision (`gyroscope agents set …`), scaffolds the empty
-`docs/agents/` spoke, and **registers** personas by copying their bytes into
-`.claude/agents/` (ADR 0010) — but it never writes the content itself. It copies
-bytes; it does not render.
+`docs/agents/` spoke, and **registers** personas into each enabled harness's
+registry — a byte-copy for Claude (ADR 0010), a deterministic format re-encode for
+OpenCode/Codex and the PI extension (ADR 0014/0015) — but it never writes the
+content itself. Re-encoding the mirror files it owns is mechanical, not templating
+of user content.
 
-## PI enforcement (opt-in)
+## Harness enforcement (opt-in per tool)
 
-gyroscope installs enforcement per harness. Claude is on by default. To enforce
-the hub for the **PI** coding agent, enable it in `gyroscope.json`:
+gyroscope installs enforcement per harness. Claude is on by default; the rest are
+opt-in via `gyroscope.json` `enforce.*` (re-run `gyroscope init --apply` after
+changing them, then `gyroscope check`). Each toggle does what that harness's
+mechanism actually allows — verified per tool, not assumed:
 
-```json
-{ "enforce": { "pi": true } }
-```
+- **`claude`** (default `true`) — merges a `SessionStart` hook into
+  `.claude/settings.json` that cats the hub + key spokes each session, and mirrors
+  personas into `.claude/agents/`.
+- **`pi`** — writes `.pi/extensions/gyroscope-context.ts` (a `session_start`
+  extension injecting the non-hub state spokes; PI reads `AGENTS.md` natively) and,
+  with personas on, `.pi/extensions/gyroscope-personas.ts` (persona subagents).
+  Then run `/trust` once in PI for this project — it loads the extensions only after
+  the project is trusted. gyroscope does **not** write PI's trust decision.
+- **`opencode`** / **`codex`** — both read `AGENTS.md` natively (no hook needed), so
+  enabling them wires the parts that aren't free: persona registration into
+  `.opencode/agents/` / `.codex/agents/` (see the personas step above), plus, for
+  Codex, `commit_attribution` when attribution is suppressed (below).
+- **`cursor`** — writes `.cursor/rules/gyroscope-hub.mdc` with `alwaysApply: true`,
+  a rule force-injected into every Cursor request ("read AGENTS.md and follow its
+  routes") — the enforcement analog above the passive `.cursorrules` pointer (ADR
+  0016). **Zed needs no toggle**: it auto-reads the `.rules` pointer every session.
+- **`aiAttribution`** (default `true`) — set `false` to suppress AI-authorship
+  credit repo-wide: writes Claude's `includeCoAuthoredBy:false` and Codex's
+  `commit_attribution=""` (when those adapters are on) and injects a cross-harness
+  hub directive so every harness honors it. Scoped to AI credit, not the developer's
+  own DCO `Signed-off-by`.
 
-Re-run `gyroscope init` to write `.pi/extensions/gyroscope-context.ts`. Then, in
-PI, run `/trust` once for this project — PI reads `AGENTS.md` and loads the
-extension only after the project is trusted. gyroscope does **not** write PI's
-trust decision; that is your security choice.
+## Code-review preset (opt-in)
+
+An alternative to the from-scratch persona interview: a curated, multi-persona
+**code-review** bundle. Trigger it when `gyroscope.json` has `"codeReview": true`, or
+when the user asks for "a review suite / reviewer personas / code-review setup." The
+binary only records the flag (`{ "codeReview": true }`); this skill authors the
+bundle — the personas are customized per repo exactly like normal personas (register
+them through the persona flow above). See ADR 0017.
+
+**Scaffold these into `docs/agents/` (repo-tuned — include only the specialists a
+reviewer would actually apply to THIS repo; drop genres that don't exist here):**
+
+- **Layer-aligned reviewer personas** — one `*-reviewer.md` per relevant area, each
+  with a `description:` trigger and an `appliesTo:` glob list scoping it to changed
+  files. The canonical menu (from a web app; keep what fits): `backend-reviewer`
+  (logic/conventions/scale), `frontend-reviewer`, `ux-reviewer`, `experience-reviewer`
+  (whole-feature product fit), `design-reviewer` (visual/brand), `db-reviewer`
+  (schema/queries/indexes/N+1), `cicd-reviewer` (pipeline/containers/deploy),
+  `security-reviewer` (auth/input/secrets/injection/authz). For a Go CLI, that's
+  typically **backend + security + cicd** only — customize each to the repo's stack,
+  strip web/UI framing.
+- **`security-reviewer`** — always runs (security issues appear in any diff).
+- **`synthesizer.md`** — aggregates the specialists' findings and **never
+  pre-filters**: consensus (2+), unique-per-specialist, cross-cutting, priorities.
+- **`intent-verifier.md`** — runs **last**, grounding each finding against the repo's
+  documented intent (`docs/adr/`, `TODO.md`, `DONE.md`, the spokes): UPHELD /
+  OVERRULED-with-citation / NEEDS-DECISION, and independently scans the diff for
+  intent-violations the reviewers missed. This is the load-bearing piece — it catches
+  the "technically right but wrong for this repo" false positive and the silent
+  regression against a prior decision. Distinct from `reality-checker` (which *runs*
+  checks to prove a claim), so keep both if the repo has one.
+- **`code-review.md` orchestrator runbook** — the workflow: identify the diff, select
+  specialists by `appliesTo` match (security always on), dispatch in parallel,
+  synthesize, then intent-verify, then present **both** blockers and non-blocking
+  findings (a clean verdict means "no blockers," not "no findings").
+- **The grounding ADR** — record an ADR in the repo's `docs/adr/` ("Ground code
+  review against documented intent") capturing *why* the intent-verifier exists, so
+  the decision is on the record like any other. It complements Claude's built-in
+  `/code-review` (that is a generic runner; this is the repo's own reviewers +
+  intent-grounding).
