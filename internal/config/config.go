@@ -19,6 +19,13 @@ type Config struct {
 	// Custom lists extra spoke doc files beyond the built-in five. Absent means
 	// none; the writer skips any entry missing a Name or Dest.
 	Custom []CustomSpoke `json:"custom"`
+	// Sync is opt-in (default false): when set, gyroscope generates a committed,
+	// dependency-free `gyroscope-sync.sh` that reconstructs the persona-registration
+	// mirrors for a teammate who cloned a repo whose generated dirs (.claude/, etc.)
+	// are gitignored and never installed gyroscope. Idempotent (skip-if-exists), so
+	// it "syncs if it hasn't been." The alternative to committing the generated dirs
+	// (the ship-to-team note). See ADR 0018.
+	Sync bool `json:"sync"`
 	// CodeReview is an opt-in persona PRESET (default false): instead of the
 	// from-scratch persona interview, the /gyroscope skill scaffolds a curated
 	// multi-persona code-review bundle — layer-aligned reviewer personas

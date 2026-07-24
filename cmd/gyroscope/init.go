@@ -96,6 +96,11 @@ func newInitCmd(stdout io.Writer) *cobra.Command {
 			if err := applyAttribution(stdout, abs, cfg); err != nil {
 				return err
 			}
+			// When sync is enabled, write the committed reconstruction script so a
+			// teammate who gitignores the generated dirs can rebuild the registrations.
+			if err := applySyncScript(stdout, abs, cfg); err != nil {
+				return err
+			}
 			// The safe subset landed. If any CONFLICT was skipped, the repo is not
 			// yet fully conformant — report drift (exit 1) so a caller/CI can see
 			// that --force is still needed, mirroring `check`'s drift signal. A clean

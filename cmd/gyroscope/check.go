@@ -107,6 +107,10 @@ func newCheckCmd(stdout io.Writer) *cobra.Command {
 				if err := applyAttribution(stdout, abs, cfg); err != nil {
 					return err
 				}
+				// Regenerate the sync script (when enabled) from the current mirror plan.
+				if err := applySyncScript(stdout, abs, cfg); err != nil {
+					return err
+				}
 			}
 
 			problems, notes, err := checkRepo(abs, cfg)
@@ -440,6 +444,23 @@ func checkRepo(repoDir string, cfg config.Config) (problems, notes []string, err
 		}
 		if !present || v {
 			problems = append(problems, ".claude/settings.json: AI attribution suppressed (enforce.aiAttribution=false) but includeCoAuthoredBy is not false (run `gyroscope check --fix`)")
+		}
+	}
+
+	// Sync script: when enabled, the committed reconstruction script must be present
+	// and current — byte-equal to what gyroscope would bake from the mirror plan — so
+	// a teammate who cloned a gitignored-generated-dirs repo can rebuild the
+	// registrations. `check --fix` regenerates it.
+	if content, ok, err := planSyncScript(repoDir, cfg); err != nil {
+		return nil, nil, err
+	} else if ok {
+		got, err := os.ReadFile(filepath.Join(repoDir, syncScriptPath))
+		if os.IsNotExist(err) {
+			problems = append(problems, syncScriptPath+": sync enabled but the reconstruction script is missing (run `gyroscope init --apply` or `check --fix`)")
+		} else if err != nil {
+			return nil, nil, err
+		} else if !bytes.Equal(got, content) {
+			problems = append(problems, syncScriptPath+": sync script differs from the standard (run `gyroscope check --fix`)")
 		}
 	}
 

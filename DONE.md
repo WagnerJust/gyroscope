@@ -401,6 +401,20 @@
   hub). Enforcement matrix now: active adapter for Claude/PI/Cursor; native auto-read for
   Zed/OpenCode/Codex; passive pointer for the rest.
 
+## Sync script — reconstruct mirrors for a fresh clone (2026-07-24; ADR 0018)
+- [x] **`sync` toggle — committed, idempotent reconstruction script.** The second answer to the
+  ship-to-team gap (besides committing the generated dirs): opt-in `gyroscope.json` `sync` flag
+  generates `gyroscope-sync.sh`, which rebuilds every enabled harness's persona-registration mirror on
+  a fresh clone. **Bakes rendered bytes (base64), not a copy-list** — bash can't reproduce the
+  OpenCode/Codex/PI re-encodes without a drifting second encoder, so it carries the encoders' *output*;
+  regenerated from the mirror plan on init/check --fix, verified byte-for-byte by check. **Idempotent**
+  (skip-if-exists → "sync if it hasn't been", never clobbers a dev's own agent). **Opt-in + dev-run,
+  not hook-wired** — the toggle is the consent; the pure-`cat` SessionStart hook is left untouched
+  (no read→write change, no auto-run trust surface); hook auto-invocation is a future add-on behind
+  the same toggle. POSIX sh + base64 (Windows gap documented). Scope: the mirrors, not the Claude
+  settings hook (JSON merge unsafe to bake — commit `settings.json` instead). Proven by an e2e test
+  that runs the script and checks byte-for-byte reconstruction + idempotency. ADR 0018.
+
 ## Code-review persona preset (2026-07-24; ADR 0017)
 - [x] **`codeReview` preset — opt-in curated review-suite scaffold.** Resolved the toggle-vs-preset
   question: a single `gyroscope.json` `codeReview` flag (default off) that REDIRECTS the persona flow

@@ -11,6 +11,7 @@ import (
 	"github.com/WagnerJust/gyroscope/internal/config"
 	"github.com/WagnerJust/gyroscope/internal/enforce"
 	"github.com/WagnerJust/gyroscope/internal/fsutil"
+	"github.com/WagnerJust/gyroscope/internal/persona"
 	"github.com/WagnerJust/gyroscope/internal/standard"
 	"github.com/WagnerJust/gyroscope/internal/target"
 )
@@ -241,5 +242,53 @@ func applyAttribution(stdout io.Writer, abs string, cfg config.Config) error {
 			fmt.Fprintln(stdout, `set .codex/config.toml commit_attribution="" (AI attribution suppressed)`)
 		}
 	}
+	return nil
+}
+
+// syncScriptPath is the committed, dependency-free reconstruction script gyroscope
+// writes when `sync` is enabled.
+const syncScriptPath = "gyroscope-sync.sh"
+
+// planSyncScript returns the sync script gyroscope would write for cfg — the baked,
+// idempotent reconstruction of every persona-registration mirror — or ok=false when
+// sync is off or there is nothing to reconstruct. Shared by init, check --fix, and
+// check's verification so all three agree on the exact bytes.
+func planSyncScript(repoDir string, cfg config.Config) (content []byte, ok bool, err error) {
+	if !cfg.Sync {
+		return nil, false, nil
+	}
+	mirrors, err := planPersonaMirrors(repoDir, cfg)
+	if err != nil {
+		return nil, false, err
+	}
+	if len(mirrors) == 0 {
+		return nil, false, nil
+	}
+	return persona.SyncScript(mirrors), true, nil
+}
+
+// applySyncScript writes gyroscope-sync.sh when sync is enabled and its content is
+// stale or absent. gyroscope owns the file (it is regenerated from the mirror plan),
+// so it overwrites atomically — like the mirror. A no-op when sync is off or the
+// script is already current. Shared by init --apply and check --fix.
+func applySyncScript(stdout io.Writer, abs string, cfg config.Config) error {
+	content, ok, err := planSyncScript(abs, cfg)
+	if err != nil {
+		return errCannotRun(err)
+	}
+	if !ok {
+		return nil
+	}
+	existing, err := os.ReadFile(filepath.Join(abs, syncScriptPath))
+	if err != nil && !os.IsNotExist(err) {
+		return errCannotRun(err)
+	}
+	if err == nil && bytes.Equal(existing, content) {
+		return nil // already current
+	}
+	if err := fsutil.WriteAtomic(abs, syncScriptPath, content); err != nil {
+		return errCannotRun(err)
+	}
+	fmt.Fprintf(stdout, "wrote %s (reconstructs persona registrations on a fresh clone)\n", syncScriptPath)
 	return nil
 }

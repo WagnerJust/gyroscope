@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"errors"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -442,6 +443,85 @@ func TestCheckCursorAdapter(t *testing.T) {
 	}
 	if b, err := os.ReadFile(rule); err != nil || !strings.Contains(string(b), "alwaysApply: true") {
 		t.Fatalf("--fix did not restore the Cursor rule (err=%v)", err)
+	}
+}
+
+// With sync enabled, init writes a committed reconstruction script; check verifies
+// it; and — the real proof — running it on a fresh clone (mirrors deleted)
+// reconstructs them byte-for-byte, idempotently.
+func TestSyncScriptReconstructsMirrors(t *testing.T) {
+	if _, err := exec.LookPath("sh"); err != nil {
+		t.Skip("sh not available")
+	}
+	dir := t.TempDir()
+	cfg := `{"sync":true,"spokes":{"personas":"on"},"enforce":{"claude":true,"opencode":true}}`
+	if err := os.WriteFile(filepath.Join(dir, "gyroscope.json"), []byte(cfg), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(filepath.Join(dir, "docs", "agents"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "docs", "agents", "backend-architect.md"), []byte(mirrorPersona), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	var out, errb bytes.Buffer
+	if err := run([]string{"init", dir, "--apply"}, &out, &errb); err != nil {
+		t.Fatalf("init --apply: %v (%s)", err, errb.String())
+	}
+	fillPlaceholders(t, dir)
+
+	script := filepath.Join(dir, "gyroscope-sync.sh")
+	if _, err := os.Stat(script); err != nil {
+		t.Fatalf("sync script not written: %v", err)
+	}
+	// check passes with the script current.
+	out.Reset()
+	errb.Reset()
+	if err := run([]string{"check", dir}, &out, &errb); err != nil {
+		t.Fatalf("check should pass with the sync script current, got %v\n%s", err, out.String())
+	}
+
+	// Simulate a fresh clone: the generated mirrors were gitignored and are absent.
+	claude := filepath.Join(dir, ".claude", "agents", "backend-architect.md")
+	opencode := filepath.Join(dir, ".opencode", "agents", "backend-architect.md")
+	want, err := os.ReadFile(claude)
+	if err != nil {
+		t.Fatal(err)
+	}
+	wantOC, err := os.ReadFile(opencode)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.RemoveAll(filepath.Join(dir, ".claude", "agents")); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.RemoveAll(filepath.Join(dir, ".opencode")); err != nil {
+		t.Fatal(err)
+	}
+
+	// Run the committed script — it must reconstruct both mirrors byte-for-byte.
+	cmd := exec.Command("sh", "gyroscope-sync.sh")
+	cmd.Dir = dir
+	if b, err := cmd.CombinedOutput(); err != nil {
+		t.Fatalf("gyroscope-sync.sh failed: %v\n%s", err, b)
+	}
+	got, err := os.ReadFile(claude)
+	if err != nil || !bytes.Equal(got, want) {
+		t.Fatalf("claude mirror not reconstructed byte-for-byte (err=%v)", err)
+	}
+	gotOC, err := os.ReadFile(opencode)
+	if err != nil || !bytes.Equal(gotOC, wantOC) {
+		t.Fatalf("opencode mirror not reconstructed byte-for-byte (err=%v)", err)
+	}
+
+	// Idempotent: a second run does not error and does not alter the reconstructed files.
+	cmd2 := exec.Command("sh", "gyroscope-sync.sh")
+	cmd2.Dir = dir
+	if b, err := cmd2.CombinedOutput(); err != nil {
+		t.Fatalf("second sync run failed: %v\n%s", err, b)
+	}
+	if got2, _ := os.ReadFile(claude); !bytes.Equal(got2, want) {
+		t.Fatal("second run altered an already-present mirror (not skip-if-exists)")
 	}
 }
 
