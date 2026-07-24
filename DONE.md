@@ -348,6 +348,30 @@
   needs a pointer file, config entry, or session hook** — nothing to wire. Conclusion is
   documentation-only: a `target` registry entry would be *wrong* (it generates a redundant pointer).
   Added a one-line acknowledgment to the hub's "Pointer files" section (ships in the standard for
-  every adopter) naming both as first-class native consumers, plus a regression test. Lean into the
-  strength: the hub already speaks the format these tools read. (Cursor/Zed active adapters + PI
-  persona parity remain separate, deferred.)
+  every adopter) naming both as native consumers, plus a regression test. Lean into the
+  strength: the hub already speaks the format these tools read. (Cursor/Zed active adapters remain
+  separate, deferred.)
+- [x] **Overclaim corrected** (`79ed6a7`). The above initially called Codex/OpenCode "first-class here
+  with nothing extra to install" — false: reading the hub natively covers only *injection*, not the
+  rest of harness parity (persona-subagent registration + attribution). Reworded to state only what is
+  true (no pointer/hook needed to inject the hub). "Ready" = the full Claude triad, built below.
+- [x] **OpenCode + Codex persona registration** (`f779da6`; ADR 0014). Extended the Claude persona
+  mirror (ADR 0010) to both harnesses' native, project-committable subagent registries. Byte-copy no
+  longer sufficed (formats differ), so the binary now RE-ENCODES gyroscope-owned mirror files:
+  `persona.Target{dest,render}`; `PlanFor` parses once and emits Claude `.claude/agents/*.md`
+  (byte-copy), OpenCode `.opencode/agents/*.md` (frontmatter → `description` + `mode: subagent`, body
+  verbatim), Codex `.codex/agents/*.toml` (body → `developer_instructions`, escaped). New opt-in
+  `enforce.opencode`/`enforce.codex` toggles, gated on `personas==on`. check verifies each mirror
+  byte-for-byte; `check --fix` re-encodes. Ruled the binary-re-encode-vs-skill fork toward the binary
+  (mechanical re-encode of owned files ≠ ADR-0003 content-templating).
+- [x] **Codex attribution** (`bef4cc2`). `enforce.codex` + `aiAttribution:false` writes top-level
+  `commit_attribution=""` into `.codex/config.toml` (Codex's co-author kill-switch); check flags a
+  missing/non-empty value. Line-edit (no TOML dependency): replace/prepend/create, preserving other
+  content, atomic. OpenCode has no attribution setting → cross-harness hub directive only.
+- [x] **PI persona parity** (`622fbcb`; ADR 0015). PI has no native registry, so parity is a generated
+  runtime extension `.pi/extensions/gyroscope-personas.ts` registering one subagent tool per persona
+  (`pi.registerTool`), each spawning headless `pi -p --append-system-prompt <body>`. gyroscope bakes
+  the persona metadata (single parser, no TS-side YAML), rides the mirror pipeline (one owned file,
+  verified byte-for-byte). Tool-restriction mapping (`--tools`) is a documented gap (Claude names
+  don't map to PI's). Confirmed against PI's extension API + headless flags before building. Full
+  harness matrix (Claude/PI/OpenCode/Codex) now reaches persona-dispatch parity when its adapter is on.
