@@ -10,6 +10,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/WagnerJust/gyroscope/internal/adr"
 	"github.com/WagnerJust/gyroscope/internal/archive"
 	"github.com/WagnerJust/gyroscope/internal/config"
 	"github.com/WagnerJust/gyroscope/internal/enforce"
@@ -279,6 +280,13 @@ func checkRepo(repoDir string, cfg config.Config) (problems, notes []string, err
 			if d := standard.AttributionDirective(cfg); d != "" && !strings.Contains(string(region), d) {
 				problems = append(problems, "AGENTS.md: AI-attribution directive missing or altered (run `gyroscope init`)")
 			}
+
+			// 7d. When the ADR spoke is enabled, the managed region carries the
+			// standing ADR directive — the "write them" (usage) half of ADR
+			// enforcement, paired with the structural hygiene check below.
+			if d := standard.ADRDirective(cfg); d != "" && !strings.Contains(string(region), d) {
+				problems = append(problems, "AGENTS.md: ADR directive missing or altered (run `gyroscope init`)")
+			}
 		}
 	}
 
@@ -370,6 +378,20 @@ func checkRepo(repoDir string, cfg config.Config) (problems, notes []string, err
 		if !strings.Contains(string(b), target.RoutingLine) {
 			problems = append(problems, fmt.Sprintf("%s: pointer file does not contain the canonical routing line", t.Path))
 		}
+	}
+
+	// 9. ADR hygiene: when the ADR spoke is enabled, docs/adr/ must be structurally
+	// sound — contiguous numbering from 0001, a Status and Date field on each
+	// record, and no reference to a nonexistent ADR number (the class of bug behind
+	// a shipped dead link). Structure only: it never judges whether *enough* ADRs
+	// were written (unknowable). check --fix cannot author these, so they surface as
+	// drift until a human resolves them — like an unfilled placeholder.
+	if cfg.Spokes.ADR {
+		records, err := readADRs(repoDir)
+		if err != nil {
+			return nil, nil, err
+		}
+		problems = append(problems, adr.Check(records)...)
 	}
 
 	// 5. Every enabled enforcement adapter's mechanism is installed and current.
@@ -471,6 +493,33 @@ func claudeShipBlocked(repoDir string) bool {
 		}
 	}
 	return ignores && !negated
+}
+
+// readADRs loads every `*.md` file under repoDir/docs/adr/ into an adr.Record for
+// the hygiene check. A missing directory yields no records (the ADR-spoke-off case
+// is already gated by the caller). os.ReadDir returns entries name-sorted, so the
+// records — and thus adr.Check's output — are deterministic.
+func readADRs(repoDir string) ([]adr.Record, error) {
+	dir := filepath.Join(repoDir, "docs", "adr")
+	entries, err := os.ReadDir(dir)
+	if os.IsNotExist(err) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	var records []adr.Record
+	for _, e := range entries {
+		if e.IsDir() || !strings.HasSuffix(e.Name(), ".md") {
+			continue
+		}
+		b, err := os.ReadFile(filepath.Join(dir, e.Name()))
+		if err != nil {
+			return nil, err
+		}
+		records = append(records, adr.Record{Name: e.Name(), Content: string(b)})
+	}
+	return records, nil
 }
 
 // routesSection returns the trimmed body of the hub's `## Routes` section — the

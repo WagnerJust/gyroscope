@@ -303,6 +303,47 @@ func TestCheckFlagsMissingPersonasDirective(t *testing.T) {
 	}
 }
 
+func TestCheckFlagsMissingADRDirective(t *testing.T) {
+	dir := initAndFill(t)
+	hub, err := os.ReadFile(filepath.Join(dir, "AGENTS.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Blank the directive heading inside the managed region so the standing text
+	// no longer matches.
+	stripped := strings.ReplaceAll(string(hub), "## Architecture decisions", "## Removed")
+	if err := os.WriteFile(filepath.Join(dir, "AGENTS.md"), []byte(stripped), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	var out, errb bytes.Buffer
+	err = run([]string{"check", dir}, &out, &errb)
+	if code := exitCodeOf(t, err); code != exitDrift {
+		t.Fatalf("missing ADR directive should drift, got code %d (%v)", code, err)
+	}
+	if !strings.Contains(out.String(), "ADR directive") {
+		t.Fatalf("drift should mention the ADR directive, got: %s", out.String())
+	}
+}
+
+// A structural ADR defect (here, a numbering gap) is drift the ADR spoke polices
+// beyond mere presence — the "keep them healthy" half of ADR enforcement.
+func TestCheckFlagsADRNumberingGap(t *testing.T) {
+	dir := initAndFill(t)
+	// init scaffolds TEMPLATE.md + 0001; add a 0003 (skipping 0002) to open a gap.
+	gap := "# ADR 0003: gap\n\n- **Status:** accepted\n- **Date:** 2026-01-01\n\n## Context\n\nx\n"
+	if err := os.WriteFile(filepath.Join(dir, "docs", "adr", "0003-gap.md"), []byte(gap), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	var out, errb bytes.Buffer
+	err := run([]string{"check", dir}, &out, &errb)
+	if code := exitCodeOf(t, err); code != exitDrift {
+		t.Fatalf("ADR numbering gap should drift, got code %d (%v)", code, err)
+	}
+	if !(strings.Contains(out.String(), "docs/adr") && strings.Contains(out.String(), "0002")) {
+		t.Fatalf("drift should name the missing ADR 0002, got: %s", out.String())
+	}
+}
+
 func TestCheckIgnoresUserContentOutsideManagedRegion(t *testing.T) {
 	dir := initAndFill(t)
 	hub, err := os.ReadFile(filepath.Join(dir, "AGENTS.md"))

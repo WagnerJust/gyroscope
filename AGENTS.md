@@ -31,4 +31,8 @@ These defer to this hub — keep each to the single routing line:
 ## Personas
 
 If `gyroscope.json` `spokes.personas` is `unknown`, then before starting other work, ask the user whether to wire agent personas for this repo (run `/gyroscope`) or skip for now. When the state is `on`, `skipped`, or `off`, do nothing about this.
+
+## Architecture decisions
+
+Record a significant architectural decision as an ADR in `docs/adr/` using `docs/adr/TEMPLATE.md`, and reference it from the code or docs it shapes. Write one only when the decision is hard to reverse, would surprise a future reader without context, and is the result of a real trade-off — skip it otherwise.
 <!-- /gyroscope -->

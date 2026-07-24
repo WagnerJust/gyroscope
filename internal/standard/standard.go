@@ -58,6 +58,7 @@ func Plan(cfg config.Config) ([]File, error) {
 			b = renderRoutes(b, cfg)
 			b = renderPersonasDirective(b, cfg)
 			b = renderAttributionDirective(b, cfg)
+			b = renderADRDirective(b, cfg)
 		}
 		files = append(files, File{Dest: e.dest, Content: b})
 	}
@@ -152,6 +153,42 @@ func renderAttributionDirective(hub []byte, cfg config.Config) []byte {
 		return []byte(s)
 	}
 	return []byte(strings.Replace(s, attributionMarker, d, 1))
+}
+
+// adrMarker is where the hub's standing ADR directive is spliced in — only when
+// the ADR spoke is enabled.
+const adrMarker = "<!-- gyroscope:adr-directive -->"
+
+// ADRDirective returns the hub's standing instruction to record significant
+// architectural decisions as ADRs when the ADR spoke is enabled, else "". It
+// echoes docs/adr/TEMPLATE.md's own guard — write one only for a hard-to-reverse,
+// surprising, genuine-trade-off decision — so it encourages the discipline without
+// pushing agents to over-produce records. Single source of truth, shared by
+// renderADRDirective and `gyroscope check`, which compares it against the on-disk
+// hub rather than re-deriving the text.
+func ADRDirective(cfg config.Config) string {
+	if !cfg.Spokes.ADR {
+		return ""
+	}
+	return "## Architecture decisions\n\n" +
+		"Record a significant architectural decision as an ADR in `docs/adr/` using " +
+		"`docs/adr/TEMPLATE.md`, and reference it from the code or docs it shapes. Write " +
+		"one only when the decision is hard to reverse, would surprise a future reader " +
+		"without context, and is the result of a real trade-off — skip it otherwise."
+}
+
+// renderADRDirective replaces adrMarker in the hub with the directive for cfg.
+// When the ADR spoke is off the marker and its preceding blank line are removed
+// cleanly, so an ADR-off hub carries no dangling marker.
+func renderADRDirective(hub []byte, cfg config.Config) []byte {
+	d := ADRDirective(cfg)
+	s := string(hub)
+	if d == "" {
+		s = strings.Replace(s, "\n\n"+adrMarker, "", 1)
+		s = strings.Replace(s, adrMarker, "", 1)
+		return []byte(s)
+	}
+	return []byte(strings.Replace(s, adrMarker, d, 1))
 }
 
 // Routes returns the hub's route block for cfg — the newline-joined bullets

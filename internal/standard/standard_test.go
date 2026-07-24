@@ -203,6 +203,37 @@ func TestHubOmitsPersonasDirectiveWhenOff(t *testing.T) {
 	}
 }
 
+func TestHubCarriesADRDirectiveWhenEnabled(t *testing.T) {
+	cfg := config.Default() // adr = true → enabled
+	files, err := Plan(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	hub := agentsContent(t, files)
+	if !strings.Contains(hub, ADRDirective(cfg)) {
+		t.Fatal("hub should carry the ADR directive when the spoke is enabled")
+	}
+	if strings.Contains(hub, "<!-- gyroscope:adr-directive -->") {
+		t.Fatal("the ADR marker should be replaced, not left in the hub")
+	}
+}
+
+func TestHubOmitsADRDirectiveWhenOff(t *testing.T) {
+	cfg := config.Default()
+	cfg.Spokes.ADR = false
+	files, err := Plan(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	hub := agentsContent(t, files)
+	if strings.Contains(hub, "Architecture decisions") {
+		t.Fatal("hub should not carry the ADR directive when the spoke is off")
+	}
+	if strings.Contains(hub, "<!-- gyroscope:adr-directive -->") {
+		t.Fatal("the ADR marker should be removed when off")
+	}
+}
+
 func TestHubOmitsDisabledSpokeRoutes(t *testing.T) {
 	cfg := config.Default()
 	cfg.Spokes.Context = false

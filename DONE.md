@@ -327,3 +327,16 @@
   CONTRIBUTING managed block — pointer files (redirects, not config), `docs/agents.md` (file) vs
   `docs/agents/` (dir), and that `.gitmessage` needs `git config commit.template` to activate.
   Explain, don't restructure; structural changes (renames, per-file comments) left by design.
+
+## Enforce ADR usage + upkeep (2026-07-23)
+- [x] **ADR enforcement — directive (write them) + structural check (keep them healthy).** Mirrors
+  the personas/attribution pattern, gated on the `adr` spoke. **Usage:** a standing managed-hub
+  directive (`## Architecture decisions`, new `<!-- gyroscope:adr-directive -->` marker) instructs
+  agents to record significant decisions as ADRs and echoes the TEMPLATE's own three-part guard so it
+  encourages without inflating the count; `standard.ADRDirective` is the single source of truth,
+  verified by `check`. **Upkeep:** new pure `internal/adr` package checks contiguous numbering from
+  0001, a `**Status:**` + `**Date:**` on every record, and no reference to a nonexistent ADR number
+  (the class of bug behind the shipped `docs/adr/0010` dead link); TEMPLATE.md excluded so its
+  `ADR-XXXX` placeholders don't register. Resolved the open notes-vs-drift question: structural
+  findings are **drift** (fail CI, like the dangling-route check), the directive stays soft. Rationale
+  in ADR 0013. TDD throughout; dogfooded (`check .` green with the hub converged + ADR 0013 added).

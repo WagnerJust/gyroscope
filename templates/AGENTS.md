@@ -23,4 +23,6 @@ These defer to this hub — keep each to the single routing line:
 
 <!-- gyroscope:personas-directive -->
 <!-- gyroscope:attribution-directive -->
+
+<!-- gyroscope:adr-directive -->
 <!-- /gyroscope -->
