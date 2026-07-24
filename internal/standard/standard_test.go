@@ -203,6 +203,25 @@ func TestHubOmitsPersonasDirectiveWhenOff(t *testing.T) {
 	}
 }
 
+// The hub acknowledges harnesses that read AGENTS.md natively (Codex, OpenCode) —
+// they need no pointer file, so this documents them as first-class rather than
+// mis-registering them as pointer targets. Guards the note against silent removal.
+func TestHubAcknowledgesNativeAgentsReaders(t *testing.T) {
+	files, err := Plan(config.Default())
+	if err != nil {
+		t.Fatal(err)
+	}
+	hub := agentsContent(t, files)
+	if !strings.Contains(hub, "natively") {
+		t.Fatal("hub should note that some harnesses read AGENTS.md natively")
+	}
+	for _, tool := range []string{"Codex", "OpenCode"} {
+		if !strings.Contains(hub, tool) {
+			t.Fatalf("hub should name %s as a native AGENTS.md reader", tool)
+		}
+	}
+}
+
 func TestHubCarriesADRDirectiveWhenEnabled(t *testing.T) {
 	cfg := config.Default() // adr = true → enabled
 	files, err := Plan(cfg)

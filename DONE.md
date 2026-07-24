@@ -340,3 +340,14 @@
   `ADR-XXXX` placeholders don't register. Resolved the open notes-vs-drift question: structural
   findings are **drift** (fail CI, like the dangling-route check), the directive stays soft. Rationale
   in ADR 0013. TDD throughout; dogfooded (`check .` green with the hub converged + ADR 0013 added).
+
+## Harness coverage — AGENTS.md-native cohort (2026-07-23)
+- [x] **Codex + OpenCode acknowledged as native `AGENTS.md` readers.** Verified against official
+  docs (2026-07-23): OpenAI Codex CLI reads `AGENTS.md` automatically every session (global →
+  root→cwd, closer-wins, 32 KiB cap) and OpenCode reads it by default (first-match-wins); **neither
+  needs a pointer file, config entry, or session hook** — nothing to wire. Conclusion is
+  documentation-only: a `target` registry entry would be *wrong* (it generates a redundant pointer).
+  Added a one-line acknowledgment to the hub's "Pointer files" section (ships in the standard for
+  every adopter) naming both as first-class native consumers, plus a regression test. Lean into the
+  strength: the hub already speaks the format these tools read. (Cursor/Zed active adapters + PI
+  persona parity remain separate, deferred.)
