@@ -399,6 +399,52 @@ func TestCheckRegistersPersonasForPI(t *testing.T) {
 	}
 }
 
+// The Cursor adapter installs a .cursor/rules/ always-apply rule (the force-inject
+// analog for Cursor); init writes it, check verifies it, removing it drifts, --fix
+// restores it.
+func TestCheckCursorAdapter(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "gyroscope.json"), []byte(`{"enforce":{"cursor":true}}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	var out, errb bytes.Buffer
+	if err := run([]string{"init", dir, "--apply"}, &out, &errb); err != nil {
+		t.Fatalf("init --apply: %v (%s)", err, errb.String())
+	}
+	fillPlaceholders(t, dir)
+
+	rule := filepath.Join(dir, ".cursor", "rules", "gyroscope-hub.mdc")
+	if b, err := os.ReadFile(rule); err != nil || !strings.Contains(string(b), "alwaysApply: true") {
+		t.Fatalf("expected an always-apply Cursor rule, err=%v", err)
+	}
+	out.Reset()
+	errb.Reset()
+	if err := run([]string{"check", dir}, &out, &errb); err != nil {
+		t.Fatalf("check should pass with the Cursor rule present, got %v\n%s", err, out.String())
+	}
+
+	if err := os.Remove(rule); err != nil {
+		t.Fatal(err)
+	}
+	out.Reset()
+	errb.Reset()
+	if code := exitCodeOf(t, run([]string{"check", dir}, &out, &errb)); code != exitDrift {
+		t.Fatalf("removing the Cursor rule should drift, got code %d", code)
+	}
+	if !strings.Contains(out.String(), "cursor") {
+		t.Fatalf("drift should name the cursor adapter, got: %s", out.String())
+	}
+
+	out.Reset()
+	errb.Reset()
+	if err := run([]string{"check", "--fix", dir}, &out, &errb); err != nil {
+		t.Fatalf("check --fix should restore the rule, got %v\n%s", err, out.String())
+	}
+	if b, err := os.ReadFile(rule); err != nil || !strings.Contains(string(b), "alwaysApply: true") {
+		t.Fatalf("--fix did not restore the Cursor rule (err=%v)", err)
+	}
+}
+
 func TestCheckOnStateRequiresPersonaFile(t *testing.T) {
 	dir := initAndFill(t)
 	var out, errb bytes.Buffer

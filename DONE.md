@@ -385,3 +385,18 @@
   else left at default (only tightens, never loosens; Codex has no per-tool allowlist). parse() now
   captures the allowlist; maps live in `internal/persona/toolmap.go`. Residual low-priority gaps
   (web tools, Codex coarseness, verify-on-target) tracked in TODO. TDD.
+
+## Cursor + Zed enforcement (2026-07-24; ADR 0016)
+- [x] **Cursor enforcement adapter** (`enforce.cursor`, opt-in). Verified Cursor has a real
+  force-inject primitive: a `.cursor/rules/*.mdc` project rule with `alwaysApply: true` is injected
+  into every request. New `enforce.Cursor` adapter writes `.cursor/rules/gyroscope-hub.mdc`
+  (alwaysApply + "read AGENTS.md and follow its routes"), rides the standard adapter interface (init
+  applies, check verifies, --fix restores). Static rule (a Cursor rule can't cat live files, so it
+  force-injects the *directive*, not hub contents; the hub routes onward). Supersedes the passive,
+  deprecated `.cursorrules` pointer for agent-mode Cursor while keeping it for back-compat. TDD.
+- [x] **Zed enforcement adapter — resolved as a no-op (documented).** Verified Zed has no
+  hook/always-apply flag; its Agent auto-reads the first-match instruction file (`.rules` wins over
+  `AGENTS.md`) on every session. So gyroscope's existing passive `.rules` pointer IS the mechanism —
+  nothing to build. Documented in ADR 0016 (with the first-match caveat: keep `.rules` pointing at the
+  hub). Enforcement matrix now: active adapter for Claude/PI/Cursor; native auto-read for
+  Zed/OpenCode/Codex; passive pointer for the rest.

@@ -19,4 +19,5 @@ type Adapter interface {
 var (
 	_ Adapter = Claude{}
 	_ Adapter = PI{}
+	_ Adapter = Cursor{}
 )

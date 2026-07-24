@@ -148,6 +148,9 @@ func enabledAdapters(cfg config.Config) []enforce.Adapter {
 	if cfg.Enforce.PI {
 		a = append(a, enforce.PI{})
 	}
+	if cfg.Enforce.Cursor {
+		a = append(a, enforce.Cursor{})
+	}
 	return a
 }
 

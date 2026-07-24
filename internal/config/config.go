@@ -35,6 +35,11 @@ type EnforceSet struct {
 	// commit_attribution setting. Off means gyroscope writes nothing tool-specific.
 	OpenCode bool `json:"opencode"`
 	Codex    bool `json:"codex"`
+	// Cursor is opt-in (default false): it installs a .cursor/rules/ always-apply
+	// rule that force-injects the hub directive into every Cursor request — the
+	// enforcement analog to Claude's hook, above the passive .cursorrules pointer.
+	// (Zed needs no adapter: it natively reads .rules every session.)
+	Cursor bool `json:"cursor"`
 	// AIAttribution controls whether AI agents may sign their work — the
 	// `Co-Authored-By` trailer / "Generated with …" footer on commits and PRs/MRs.
 	// Default true (unchanged behavior). Set false to suppress it repo-wide: the
@@ -127,7 +132,7 @@ func Default() Config {
 			Context: true, Agents: true, ADR: true, Personas: PersonaUnknown, Local: true,
 			Contributing: true, PRTemplate: true, CommitConvention: true, State: true,
 		},
-		Enforce: EnforceSet{Claude: true, PI: false, OpenCode: false, Codex: false, AIAttribution: true},
+		Enforce: EnforceSet{Claude: true, PI: false, OpenCode: false, Codex: false, Cursor: false, AIAttribution: true},
 	}
 }
 
