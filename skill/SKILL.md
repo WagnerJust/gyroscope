@@ -243,10 +243,14 @@ mechanism actually allows — verified per tool, not assumed:
   with personas on, `.pi/extensions/gyroscope-personas.ts` (persona subagents).
   Then run `/trust` once in PI for this project — it loads the extensions only after
   the project is trusted. gyroscope does **not** write PI's trust decision.
-- **`opencode`** / **`codex`** — both read `AGENTS.md` natively (no hook needed), so
-  enabling them wires the parts that aren't free: persona registration into
-  `.opencode/agents/` / `.codex/agents/` (see the personas step above), plus, for
-  Codex, `commit_attribution` when attribution is suppressed (below).
+- **`opencode`** — reads `AGENTS.md` natively, so enabling it wires the parts that
+  aren't free: persona registration into `.opencode/agents/` (see personas above), and
+  it merges the non-hub **state spokes** into `opencode.json` `instructions` (OpenCode's
+  always-load mechanism — the analog of Claude's hook, since native read covers only
+  the hub, not the resume state). `.local/*` personal spokes are excluded (gitignored;
+  no missing-file tolerance).
+- **`codex`** — reads `AGENTS.md` natively; persona registration into `.codex/agents/`
+  (see personas above), plus `commit_attribution` when attribution is suppressed (below).
 - **`cursor`** — writes `.cursor/rules/gyroscope-hub.mdc` with `alwaysApply: true`,
   a rule force-injected into every Cursor request ("read AGENTS.md and follow its
   routes") — the enforcement analog above the passive `.cursorrules` pointer (ADR
@@ -256,6 +260,53 @@ mechanism actually allows — verified per tool, not assumed:
   `commit_attribution=""` (when those adapters are on) and injects a cross-harness
   hub directive so every harness honors it. Scoped to AI credit, not the developer's
   own DCO `Signed-off-by`.
+
+## Cross-harness slash commands (`docs/commands/`)
+
+Author a slash command ONCE in `docs/commands/<name>.md` and gyroscope re-encodes it
+into every enabled harness (ADR 0019): `.claude/commands/<name>.md`,
+`.opencode/commands/<name>.md`, `.pi/prompts/<name>.md` — dispatchable as `/name`
+everywhere. Write the canonical file in the **Claude command format** (the superset):
+optional YAML frontmatter (`description`, `argument-hint`, `allowed-tools`, `model`)
+plus the prompt body. The body syntax is portable — `$ARGUMENTS`/`$1`, `` !`cmd` ``
+shell injection, `@file` references all work in every target — so only the frontmatter
+is reduced per harness (OpenCode keeps `description`; PI keeps `description` +
+`argument-hint`; Claude-only keys are dropped, not mistranslated).
+
+- **Gating:** per enabled harness (`enforce.{claude,opencode,pi}`), presence-driven —
+  a repo with `docs/commands/*.md` gets them; no separate toggle, and **independent of
+  the personas state**.
+- **Adopt existing:** if the repo already has `.claude/commands/*.md`, move them into
+  `docs/commands/` once (like persona adoption) so the other harnesses get them too;
+  then re-run `gyroscope init --apply`.
+- Generated command files are gyroscope-owned mirrors — `check` verifies them,
+  `check --fix` re-encodes, and `gyroscope-sync.sh` (if `sync` is on) bakes them for a
+  binary-less clone. The binary re-encodes; it never authors the command body.
+
+## MCP servers (`gyroscope.json` `mcp`)
+
+Declare shared MCP servers once in `gyroscope.json` and gyroscope re-encodes them per
+enabled harness (ADR 0020):
+
+```json
+{ "mcp": {
+    "linear": { "command": "npx", "args": ["-y","linear-mcp"], "env": { "KEY": "${LINEAR_KEY}" } },
+    "docs":   { "url": "https://x/mcp", "headers": { "Authorization": "${DOCS_TOKEN}" } }
+} }
+```
+
+A server is stdio/local when it has a `command`, remote when it has a `url`.
+
+- **Secrets:** use `${ENV_VAR}` references only, never raw keys — every target expands
+  env vars, so the generated configs are safe to commit and to bake into the sync
+  script. gyroscope passes the refs through verbatim.
+- **Targets:** Claude → dedicated `.mcp.json` (gyroscope-owned whole file, gitignorable,
+  reconstructed by sync). OpenCode → merged into `opencode.json` `mcp` (shared config;
+  gyroscope's declared servers are added by name, the user's other entries preserved —
+  but a server removed from `gyroscope.json` is not auto-pruned from the shared file).
+- **Gating:** `mcp` non-empty AND `enforce.<harness>`. Absent `mcp` = feature off.
+- PI MCP is not built in and is reached via a generated client extension — a separate,
+  later addition; declaring `mcp` does not yet write anything for PI.
 
 ## Code-review preset (opt-in)
 

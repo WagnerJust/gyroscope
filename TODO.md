@@ -8,7 +8,7 @@
 **Legend:** `[ ]` not started · `[~] `in progress · `[x]` done (then move to `DONE.md`)
 
 ## Next
-- (all build-tracker "Next" items complete — see `DONE.md`)
+- [ ] **Cross-harness artifact sync — Phase 6: PI MCP (last, droppable).** Design in `.local/design/2026-08-24-cross-harness-artifact-sync-design.md`; phases 1-5 (commands, OpenCode injection fix, Claude/OpenCode MCP, sync-bake, skill/docs) are done (see `DONE.md`). Remaining: give PI genuine MCP by generating (a) `.pi/mcp.json` config (standard `mcpServers` shape, stdio-first, from the same neutral `gyroscope.json mcp` block) and (b) our OWN minimal MCP-client extension `.pi/extensions/gyroscope-mcp/` (`index.ts` + `package.json` declaring the OFFICIAL `@modelcontextprotocol/sdk`, pinned — NOT a community wrapper) that reads the config, connects over stdio, discovers tools, and `registerTool`-proxies them (`mcp_<server>_<tool>`). Both are dedicated gyroscope-owned files → ride `planMirrors` + bake into sync. Known risk (research): bridging MCP tool `inputSchema` (JSON Schema) to PI's typebox `parameters` is fiddly and is **UNVERIFIED against live PI** — needs a smoke-test on the real tool before shipping. Low-regret: config is identical to a community-extension fallback (`pi-mcp-extension`, pinned), so swappable/cuttable without touching phases 1-5. One-time teammate step: `npm install` in the extension dir.
 
 ## Known non-issues (kept for context; not action items)
 - [ ] (note, not fixed) `go build ./cmd/gyroscope` reports `dev (commit none, built unknown)` — no ldflags; `make build` is the versioned path. Expected, documented as the "quick local binary."

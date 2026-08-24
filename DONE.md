@@ -8,6 +8,31 @@
 
 **Legend:** `[x]` done
 
+## Cross-harness artifact sync — commands + MCP (2026-08-24)
+> Design: `.local/design/2026-08-24-cross-harness-artifact-sync-design.md`. Solves the "dev uses
+> neither gyroscope nor Claude Code" cases by extending the per-harness re-encode pattern to two new
+> author-once artifact types. Scope: Claude/OpenCode/PI (enforce.* IS the harness list). Phase 6 (PI
+> MCP) still open — see `TODO.md`.
+- [x] **Phase 1 — cross-harness slash commands** (`38ad110`; ADR 0019). `internal/command` re-encodes
+  `docs/commands/<name>.md` into `.claude/commands/`, `.opencode/commands/`, `.pi/prompts/` (body
+  portable; frontmatter reduced per harness; Claude-only keys dropped). Presence-driven per enabled
+  harness, independent of personas. `planMirrors` now unifies persona + command generated files → one
+  path for init/check/sync.
+- [x] **Phase 2 — OpenCode state-spoke injection fix** (`904fa47`). New `enforce.OpenCode` adapter
+  merges the non-hub committed spokes into `opencode.json` `instructions` (the hook analog OpenCode
+  lacked). Rides the adapter framework. `.local/*` excluded (documented). No ADR (extends ADR 0006).
+- [x] **Phase 3 — cross-harness MCP** (`de4831e`; ADR 0020). Neutral `gyroscope.json mcp` block
+  (`${VAR}` refs only) → `internal/mcp` transforms → Claude `.mcp.json` (dedicated, gyroscope-owned,
+  rides `planMirrors`) + OpenCode `opencode.json mcp` (shared, merged by name). File-ownership splits
+  by the tool's layout; shared-config no-prune trade documented.
+- [x] **Phase 4 — sync bakes commands + dedicated MCP** (`0705045`). Wired free via `planMirrors`;
+  e2e test proves a command file + `.mcp.json` reconstruct byte-for-byte on a fresh clone, `${VAR}`
+  intact (no secret leak).
+- [x] **Phase 5 — skill + docs**. SKILL.md documents cross-harness commands (+ adopt-existing), the
+  MCP block (+ `${VAR}` safety + per-harness targets), and the OpenCode instructions injection.
+  Decided AGAINST a hub route/scaffold for `docs/commands/` (generated-artifact feature, skill-discovered
+  — keeps the standard lean).
+
 ## Now — lock the design
 - [x] Agree thesis: opinionated, self-enforcing evolution of buckle's hub-and-spoke
 - [x] Choose form: new standalone Go binary, `gyroscope`
