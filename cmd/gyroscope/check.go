@@ -75,7 +75,7 @@ func newCheckCmd(stdout io.Writer) *cobra.Command {
 				// .claude/agents/ mirror files, so this safely overwrites a drifted
 				// mirror (unlike the user-content-preserving convergence above). A
 				// closed gate mirrors nothing.
-				mirrors, err := planPersonaMirrors(abs, cfg)
+				mirrors, err := planMirrors(abs, cfg)
 				if err != nil {
 					return errCannotRun(err)
 				}
@@ -342,29 +342,30 @@ func checkRepo(repoDir string, cfg config.Config) (problems, notes []string, err
 		if !wired {
 			problems = append(problems, "docs/agents/: personas state is `on` but no persona files present (only README)")
 		}
+	}
 
-		// 8b. Registration: for each enabled harness registry (personas on AND that
-		// adapter enabled), every canonical persona must be mirrored into that
-		// harness's subagent file — byte-equal to what gyroscope would re-encode from
-		// its docs/agents/ source — which is what makes the harness register it as a
-		// dispatchable subagent (ADR 0010, extended per-harness in ADR 0014). A missing
-		// or drifted mirror is nonconformance; `check --fix` re-mirrors above.
-		mirrors, err := planPersonaMirrors(repoDir, cfg)
+	// 8b. Registration: every gyroscope-owned generated file for the enabled harnesses
+	// — persona subagent registrations (docs/agents/, gated on personas `on` inside
+	// planMirrors) and command re-encodings (docs/commands/) — must exist on disk,
+	// byte-equal to what gyroscope would re-encode from its canonical source (ADR
+	// 0010/0014, and 0019 for commands). A missing or drifted file is nonconformance;
+	// `check --fix` re-writes it. This runs independent of the personas state so a
+	// commands-only repo is still checked.
+	mirrors, err := planMirrors(repoDir, cfg)
+	if err != nil {
+		return nil, nil, err
+	}
+	for _, m := range mirrors {
+		got, err := os.ReadFile(filepath.Join(repoDir, m.Dest))
+		if os.IsNotExist(err) {
+			problems = append(problems, fmt.Sprintf("%s: generated file missing (run `gyroscope init --apply` or `check --fix`)", m.Dest))
+			continue
+		}
 		if err != nil {
 			return nil, nil, err
 		}
-		for _, m := range mirrors {
-			got, err := os.ReadFile(filepath.Join(repoDir, m.Dest))
-			if os.IsNotExist(err) {
-				problems = append(problems, fmt.Sprintf("%s: persona not registered — mirror missing (run `gyroscope init --apply` or `check --fix`)", m.Dest))
-				continue
-			}
-			if err != nil {
-				return nil, nil, err
-			}
-			if !bytes.Equal(got, m.Bytes) {
-				problems = append(problems, fmt.Sprintf("%s: persona mirror differs from its docs/agents/ source (run `check --fix` to re-mirror)", m.Dest))
-			}
+		if !bytes.Equal(got, m.Bytes) {
+			problems = append(problems, fmt.Sprintf("%s: generated file differs from its canonical source (run `check --fix` to re-write)", m.Dest))
 		}
 	}
 

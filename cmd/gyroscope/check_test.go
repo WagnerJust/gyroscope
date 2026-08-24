@@ -525,6 +525,80 @@ func TestSyncScriptReconstructsMirrors(t *testing.T) {
 	}
 }
 
+const testCommand = "---\n" +
+	"description: Fix a GitHub issue\n" +
+	"argument-hint: [issue-number]\n" +
+	"allowed-tools: Bash(git *)\n" +
+	"---\nFix issue $ARGUMENTS.\n"
+
+// A canonical docs/commands/ command re-encodes into each enabled harness's command
+// location — independent of the personas state — and check verifies each byte-equal.
+func TestCheckGeneratesCommandsPerHarness(t *testing.T) {
+	dir := t.TempDir()
+	// personas OFF on purpose: commands must not depend on the persona state.
+	cfg := `{"spokes":{"personas":"off"},"enforce":{"claude":true,"opencode":true,"pi":true}}`
+	if err := os.WriteFile(filepath.Join(dir, "gyroscope.json"), []byte(cfg), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(filepath.Join(dir, "docs", "commands"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "docs", "commands", "fix.md"), []byte(testCommand), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	var out, errb bytes.Buffer
+	if err := run([]string{"init", dir, "--apply"}, &out, &errb); err != nil {
+		t.Fatalf("init --apply: %v (%s)", err, errb.String())
+	}
+	fillPlaceholders(t, dir)
+
+	claude := filepath.Join(dir, ".claude", "commands", "fix.md")
+	opencode := filepath.Join(dir, ".opencode", "commands", "fix.md")
+	pi := filepath.Join(dir, ".pi", "prompts", "fix.md")
+	for _, p := range []string{claude, opencode, pi} {
+		if _, err := os.Stat(p); err != nil {
+			t.Fatalf("expected generated command %s: %v", p, err)
+		}
+	}
+	// OpenCode drops argument-hint; PI keeps it; both keep the body.
+	if b, _ := os.ReadFile(opencode); strings.Contains(string(b), "argument-hint") {
+		t.Errorf("opencode command should drop argument-hint:\n%s", b)
+	}
+	if b, _ := os.ReadFile(pi); !strings.Contains(string(b), "argument-hint: [issue-number]") {
+		t.Errorf("pi command should keep argument-hint:\n%s", b)
+	}
+	if b, _ := os.ReadFile(pi); !strings.Contains(string(b), "Fix issue $ARGUMENTS.") {
+		t.Errorf("pi command must keep the body verbatim:\n%s", b)
+	}
+
+	out.Reset()
+	errb.Reset()
+	if err := run([]string{"check", dir}, &out, &errb); err != nil {
+		t.Fatalf("check should pass with commands generated, got %v\n%s", err, out.String())
+	}
+
+	// Remove one → drift; --fix restores.
+	if err := os.Remove(opencode); err != nil {
+		t.Fatal(err)
+	}
+	out.Reset()
+	errb.Reset()
+	if code := exitCodeOf(t, run([]string{"check", dir}, &out, &errb)); code != exitDrift {
+		t.Fatalf("missing command should drift, got code %d", code)
+	}
+	if !strings.Contains(out.String(), ".opencode/commands") {
+		t.Fatalf("drift should name the missing command, got: %s", out.String())
+	}
+	out.Reset()
+	errb.Reset()
+	if err := run([]string{"check", "--fix", dir}, &out, &errb); err != nil {
+		t.Fatalf("check --fix: %v\n%s", err, out.String())
+	}
+	if err := run([]string{"check", dir}, &out, &errb); err != nil {
+		t.Fatalf("check should pass after --fix restored the command, got %v", err)
+	}
+}
+
 func TestCheckOnStateRequiresPersonaFile(t *testing.T) {
 	dir := initAndFill(t)
 	var out, errb bytes.Buffer

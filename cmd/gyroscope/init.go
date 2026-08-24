@@ -40,9 +40,10 @@ func newInitCmd(stdout io.Writer) *cobra.Command {
 			paths := hookPathsFor(cfg)
 			adapters := enabledAdapters(cfg)
 			items := classify(abs, files)
-			// Persona mirrors (docs/agents/<file> → .claude/agents/<name>.md) register
-			// each persona as a Claude subagent. Gated: personas on AND Claude enabled.
-			mirrors, err := planPersonaMirrors(abs, cfg)
+			// Generated files: persona registrations (docs/agents/ → each harness's
+			// subagent registry) + command re-encodings (docs/commands/ → each
+			// harness's command dir). Gated per harness by enforce.*.
+			mirrors, err := planMirrors(abs, cfg)
 			if err != nil {
 				return errCannotRun(err)
 			}

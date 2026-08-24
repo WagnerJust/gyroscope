@@ -257,7 +257,7 @@ func planSyncScript(repoDir string, cfg config.Config) (content []byte, ok bool,
 	if !cfg.Sync {
 		return nil, false, nil
 	}
-	mirrors, err := planPersonaMirrors(repoDir, cfg)
+	mirrors, err := planMirrors(repoDir, cfg)
 	if err != nil {
 		return nil, false, err
 	}
