@@ -45,21 +45,22 @@ const PIExtensionPackageJSON = `{
 `
 
 // PIExtensionIndex is the generated MCP-client extension. PI has no built-in MCP, so
-// this bridges it: on load it reads .pi/mcp.json, connects to each stdio server via
-// the official SDK, discovers its tools, and registers a proxy tool per MCP tool
-// (mcp_<server>_<tool>) whose execute() forwards the call. A failing server is
-// skipped, never fatal to startup. This exact shape was validated live against pi
-// 0.84.3 + the filesystem MCP server (MCP inputSchema passes straight to PI's
-// typebox `parameters`, no shim). Remote (url) transport is a later addition — the
-// extension currently connects stdio servers only.
+// this bridges it: on load it reads .pi/mcp.json, connects to each server (stdio via
+// command, or streamable-HTTP via url) with the official SDK, discovers its tools, and
+// registers a proxy tool per MCP tool (mcp_<server>_<tool>) whose execute() forwards
+// the call. A failing server is skipped, never fatal to startup. This exact shape was
+// validated live against pi 0.84.3 with BOTH a stdio server (filesystem) and a remote
+// streamable-HTTP server (everything) — MCP inputSchema passes straight to PI's typebox
+// `parameters`, no shim.
 const PIExtensionIndex = `// gyroscope-mcp.ts — managed by gyroscope; do not edit by hand.
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
+import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
-interface Server { command?: string; args?: string[]; env?: Record<string, string>; }
+interface Server { command?: string; args?: string[]; env?: Record<string, string>; url?: string; headers?: Record<string, string>; }
 
 export default async function (pi: ExtensionAPI) {
   let servers: Record<string, Server> = {};
@@ -71,13 +72,20 @@ export default async function (pi: ExtensionAPI) {
   }
   const clients: Client[] = [];
   for (const [name, s] of Object.entries(servers)) {
-    if (!s.command) continue; // stdio only for now
     try {
-      const env: Record<string, string> = {};
-      for (const [k, v] of Object.entries(process.env)) if (v !== undefined) env[k] = v;
-      Object.assign(env, s.env ?? {});
+      let transport: StdioClientTransport | StreamableHTTPClientTransport;
+      if (s.url) {
+        const opts = s.headers ? { requestInit: { headers: s.headers } } : undefined;
+        transport = new StreamableHTTPClientTransport(new URL(s.url), opts);
+      } else if (s.command) {
+        const env: Record<string, string> = {};
+        for (const [k, v] of Object.entries(process.env)) if (v !== undefined) env[k] = v;
+        Object.assign(env, s.env ?? {});
+        transport = new StdioClientTransport({ command: s.command, args: s.args ?? [], env });
+      } else {
+        continue;
+      }
       const client = new Client({ name: "gyroscope-pi", version: "1.0.0" }, { capabilities: {} });
-      const transport = new StdioClientTransport({ command: s.command, args: s.args ?? [], env });
       await Promise.race([
         client.connect(transport),
         new Promise((_, reject) => setTimeout(() => reject(new Error("mcp connect timeout")), 20000)),

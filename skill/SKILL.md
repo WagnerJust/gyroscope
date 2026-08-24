@@ -308,8 +308,8 @@ A server is stdio/local when it has a `command`, remote when it has a `url`.
 - **PI** (`enforce.pi`) → gyroscope generates `.pi/mcp.json` PLUS a minimal MCP-client
   extension `.pi/extensions/gyroscope-mcp/` (`index.ts` + `package.json`) since PI has
   no native MCP — using only the OFFICIAL `@modelcontextprotocol/sdk` (no community
-  wrapper; ADR 0021). One-time teammate step: `npm install` in that dir. Stdio servers
-  only for now (remote `url` written to config but not yet connected). Validated live.
+  wrapper; ADR 0021). One-time teammate step: `npm install` in that dir. Handles both
+  stdio (`command`) and remote (`url`, streamable-HTTP) servers. Validated live.
 
 ## Code-review preset (opt-in)
 

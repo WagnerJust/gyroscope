@@ -46,6 +46,12 @@
   only for now. **Prototyped + validated live BEFORE encoding into Go** (the research's schema-bridging
   risk turned out to need no shim); re-validated from the real binary output. Low-regret: the config
   is the standard `mcpServers` shape a community extension also reads, so swappable.
+- [x] **PI MCP remote transport** (finishing what was cut). The generated extension now connects
+  **remote** streamable-HTTP servers (`url` + optional `headers`) as well as stdio (`command`) —
+  validated live against the official "everything" server over http (`mcp_everything_echo` round-trips).
+  Gotcha found + documented in ADR 0021: verify with `--tools <name>` (deterministic), NOT "list your
+  tools" — the model formats that answer unreliably, which sent an earlier debug pass chasing a
+  non-bug. `StreamableHTTPClientTransport` is statically imported (PI's loader compiles it fine).
 - [x] **Relabel** the mirror-write message `mirrored persona X` → `generated X` (it now covers
   commands + MCP configs + extensions, not just personas).
 

@@ -98,7 +98,7 @@ func TestPIExtensionArtifacts(t *testing.T) {
 	if strings.Contains(PIExtensionPackageJSON, "pi-mcp-extension") || strings.Contains(PIExtensionIndex, "pi-mcp-extension") {
 		t.Error("must not depend on the community wrapper")
 	}
-	for _, want := range []string{"pi.registerTool(", "StdioClientTransport", "mcp_", "listTools()", "session_shutdown"} {
+	for _, want := range []string{"pi.registerTool(", "StdioClientTransport", "StreamableHTTPClientTransport", "mcp_", "listTools()", "session_shutdown"} {
 		if !strings.Contains(PIExtensionIndex, want) {
 			t.Errorf("generated extension missing %q", want)
 		}

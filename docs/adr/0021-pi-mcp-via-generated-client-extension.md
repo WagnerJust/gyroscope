@@ -34,10 +34,15 @@ into the sync script):
   pinned. The teammate runs `npm install` in that dir once (documented, like PI
   `/trust`).
 
-**This was validated live** against pi 0.84.3 + the official filesystem MCP server:
-the extension loads, connects, registers every tool, and a tool call round-trips —
-and MCP's raw `inputSchema` (JSON Schema) passes straight to PI's typebox
-`parameters` with **no shim**, resolving the one risk the research flagged.
+The extension connects **stdio** servers (via `command`) and **remote** servers (via
+`url`, streamable-HTTP, with optional `headers`).
+
+**This was validated live** against pi 0.84.3 with BOTH a stdio server (the official
+filesystem server) and a remote streamable-HTTP server (the official "everything"
+server): the extension loads, connects, registers every tool, and a tool call
+round-trips on each transport — and MCP's raw `inputSchema` (JSON Schema) passes
+straight to PI's typebox `parameters` with **no shim**, resolving the one risk the
+research flagged.
 
 ## Consequences
 
@@ -51,6 +56,9 @@ and MCP's raw `inputSchema` (JSON Schema) passes straight to PI's typebox
 - Low-regret by construction: the generated `.pi/mcp.json` is the standard shape a
   community extension (e.g. `pi-mcp-extension`, pinned) also reads, so swapping to one
   is a docs change, not a rewrite.
-- Current limits (honest): stdio transport only (remote `url` servers are written to
-  the config but not yet connected); running a separate community MCP extension
-  alongside this one would double-register — use one.
+- Both transports work (stdio + remote streamable-HTTP). Implementation note for the
+  remote path: `StreamableHTTPClientTransport` must be **statically** imported — PI's
+  extension loader compiles fine with the static import, and the `--tools <name>`
+  check (not "list your tools", which the model formats unreliably) is the sound way
+  to verify registration. Running a separate community MCP extension alongside this
+  one would double-register — use one.
