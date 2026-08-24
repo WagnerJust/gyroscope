@@ -714,6 +714,61 @@ func TestCheckMCPClaudeAndOpenCode(t *testing.T) {
 	}
 }
 
+// The sync script reconstructs ALL dedicated gyroscope-owned files — not just
+// persona mirrors — so a command file and the dedicated .mcp.json come back too
+// (with the env-var ref intact, never a secret).
+func TestSyncBakesCommandsAndMCP(t *testing.T) {
+	if _, err := exec.LookPath("sh"); err != nil {
+		t.Skip("sh not available")
+	}
+	dir := t.TempDir()
+	cfg := `{"sync":true,"enforce":{"claude":true},"mcp":{"linear":{"command":"npx","args":["-y","linear-mcp"],"env":{"K":"${LINEAR_KEY}"}}}}`
+	if err := os.WriteFile(filepath.Join(dir, "gyroscope.json"), []byte(cfg), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(filepath.Join(dir, "docs", "commands"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "docs", "commands", "deploy.md"), []byte("Deploy $ARGUMENTS.\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	var out, errb bytes.Buffer
+	if err := run([]string{"init", dir, "--apply"}, &out, &errb); err != nil {
+		t.Fatalf("init --apply: %v (%s)", err, errb.String())
+	}
+	fillPlaceholders(t, dir)
+
+	cmdFile := filepath.Join(dir, ".claude", "commands", "deploy.md")
+	mcpFile := filepath.Join(dir, ".mcp.json")
+	wantCmd, err := os.ReadFile(cmdFile)
+	if err != nil {
+		t.Fatal(err)
+	}
+	wantMCP, err := os.ReadFile(mcpFile)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Simulate a fresh clone: dedicated generated files gitignored + absent.
+	os.RemoveAll(filepath.Join(dir, ".claude"))
+	os.Remove(mcpFile)
+
+	c := exec.Command("sh", "gyroscope-sync.sh")
+	c.Dir = dir
+	if b, err := c.CombinedOutput(); err != nil {
+		t.Fatalf("sync script failed: %v\n%s", err, b)
+	}
+	if got, err := os.ReadFile(cmdFile); err != nil || !bytes.Equal(got, wantCmd) {
+		t.Fatalf("command file not reconstructed byte-for-byte (err=%v)", err)
+	}
+	got, err := os.ReadFile(mcpFile)
+	if err != nil || !bytes.Equal(got, wantMCP) {
+		t.Fatalf(".mcp.json not reconstructed byte-for-byte (err=%v)", err)
+	}
+	if !strings.Contains(string(got), "${LINEAR_KEY}") {
+		t.Errorf("reconstructed .mcp.json should keep the env-var ref (no secret leak):\n%s", got)
+	}
+}
+
 func TestCheckOnStateRequiresPersonaFile(t *testing.T) {
 	dir := initAndFill(t)
 	var out, errb bytes.Buffer
