@@ -769,6 +769,57 @@ func TestSyncBakesCommandsAndMCP(t *testing.T) {
 	}
 }
 
+// With enforce.pi + an mcp block, gyroscope generates PI's config plus the
+// MCP-client extension (config + index.ts + package.json) as dedicated owned files;
+// check verifies each, drift is caught, --fix restores.
+func TestCheckMCPForPI(t *testing.T) {
+	dir := t.TempDir()
+	cfg := `{"enforce":{"pi":true},"mcp":{"fs":{"command":"npx","args":["-y","srv"]}}}`
+	if err := os.WriteFile(filepath.Join(dir, "gyroscope.json"), []byte(cfg), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	var out, errb bytes.Buffer
+	if err := run([]string{"init", dir, "--apply"}, &out, &errb); err != nil {
+		t.Fatalf("init --apply: %v (%s)", err, errb.String())
+	}
+	fillPlaceholders(t, dir)
+
+	cfgFile := filepath.Join(dir, ".pi", "mcp.json")
+	idx := filepath.Join(dir, ".pi", "extensions", "gyroscope-mcp", "index.ts")
+	pkg := filepath.Join(dir, ".pi", "extensions", "gyroscope-mcp", "package.json")
+	for _, p := range []string{cfgFile, idx, pkg} {
+		if _, err := os.Stat(p); err != nil {
+			t.Fatalf("expected generated PI MCP file %s: %v", p, err)
+		}
+	}
+	if b, _ := os.ReadFile(idx); !strings.Contains(string(b), "registerTool") {
+		t.Errorf("extension index.ts missing registerTool:\n%s", b)
+	}
+
+	out.Reset()
+	errb.Reset()
+	if err := run([]string{"check", dir}, &out, &errb); err != nil {
+		t.Fatalf("check should pass with PI MCP generated, got %v\n%s", err, out.String())
+	}
+
+	if err := os.Remove(idx); err != nil {
+		t.Fatal(err)
+	}
+	out.Reset()
+	errb.Reset()
+	if code := exitCodeOf(t, run([]string{"check", dir}, &out, &errb)); code != exitDrift {
+		t.Fatalf("missing extension should drift, got code %d", code)
+	}
+	out.Reset()
+	errb.Reset()
+	if err := run([]string{"check", "--fix", dir}, &out, &errb); err != nil {
+		t.Fatalf("check --fix: %v\n%s", err, out.String())
+	}
+	if err := run([]string{"check", dir}, &out, &errb); err != nil {
+		t.Fatalf("check should pass after --fix, got %v", err)
+	}
+}
+
 func TestCheckOnStateRequiresPersonaFile(t *testing.T) {
 	dir := initAndFill(t)
 	var out, errb bytes.Buffer

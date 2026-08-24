@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"io"
+	"path/filepath"
 
 	"github.com/WagnerJust/gyroscope/internal/config"
 	"github.com/WagnerJust/gyroscope/internal/enforce"
@@ -27,6 +28,21 @@ func planMCPMirrors(repoDir string, cfg config.Config) ([]persona.Mirror, error)
 			return nil, err
 		}
 		out = append(out, persona.Mirror{Src: "gyroscope.json", Dest: ".mcp.json", Bytes: b})
+	}
+	if cfg.Enforce.PI {
+		// PI has no native MCP: gyroscope generates the config PLUS a minimal
+		// MCP-client extension (official SDK) that reads it — both dedicated,
+		// gyroscope-owned files (ADR 0021). The teammate runs `npm install` in the
+		// extension dir once.
+		b, err := mcp.PIConfig(cfg.MCP)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out,
+			persona.Mirror{Src: "gyroscope.json", Dest: filepath.FromSlash(".pi/mcp.json"), Bytes: b},
+			persona.Mirror{Src: "gyroscope.json", Dest: filepath.FromSlash(".pi/extensions/gyroscope-mcp/index.ts"), Bytes: []byte(mcp.PIExtensionIndex)},
+			persona.Mirror{Src: "gyroscope.json", Dest: filepath.FromSlash(".pi/extensions/gyroscope-mcp/package.json"), Bytes: []byte(mcp.PIExtensionPackageJSON)},
+		)
 	}
 	return out, nil
 }

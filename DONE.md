@@ -11,8 +11,14 @@
 ## Cross-harness artifact sync — commands + MCP (2026-08-24)
 > Design: `.local/design/2026-08-24-cross-harness-artifact-sync-design.md`. Solves the "dev uses
 > neither gyroscope nor Claude Code" cases by extending the per-harness re-encode pattern to two new
-> author-once artifact types. Scope: Claude/OpenCode/PI (enforce.* IS the harness list). Phase 6 (PI
-> MCP) still open — see `TODO.md`.
+> author-once artifact types. Scope: Claude/OpenCode/PI (enforce.* IS the harness list). **All phases
+> done + LIVE-VALIDATED** against real opencode 1.18.15 + pi 0.84.3 (2026-08-24): OpenCode shows the
+> generated persona as `reviewer (subagent)` with the tool-map `permission:` block, connects the
+> merged MCP server (`opencode mcp list` → ✓ connected), and reads the injected `instructions`; PI
+> registers the persona tool (`--tools reviewer` runs), expands the `/deploy` prompt-template, and —
+> Phase 6 — the generated MCP-client extension loads, connects, registers every tool, and a tool call
+> round-trips (MCP `inputSchema` → PI typebox `parameters` with no shim). `gyroscope check` stays
+> conformant even after opencode rewrote its own `opencode.json` (validating the merge-preserve design).
 - [x] **Phase 1 — cross-harness slash commands** (`38ad110`; ADR 0019). `internal/command` re-encodes
   `docs/commands/<name>.md` into `.claude/commands/`, `.opencode/commands/`, `.pi/prompts/` (body
   portable; frontmatter reduced per harness; Claude-only keys dropped). Presence-driven per enabled
@@ -32,6 +38,16 @@
   MCP block (+ `${VAR}` safety + per-harness targets), and the OpenCode instructions injection.
   Decided AGAINST a hub route/scaffold for `docs/commands/` (generated-artifact feature, skill-discovered
   — keeps the standard lean).
+- [x] **Phase 6 — PI MCP** (ADR 0021). PI has no native MCP, so gyroscope generates `.pi/mcp.json`
+  PLUS its OWN minimal MCP-client extension `.pi/extensions/gyroscope-mcp/` (index.ts + package.json)
+  using only the OFFICIAL `@modelcontextprotocol/sdk` (pinned) — NOT a community wrapper (Justin's
+  call; consistent with dependency-light + the gyroscope-personas.ts precedent). All 3 files are
+  dedicated owned mirrors → written/verified/baked-into-sync. Teammate runs `npm install` once. Stdio
+  only for now. **Prototyped + validated live BEFORE encoding into Go** (the research's schema-bridging
+  risk turned out to need no shim); re-validated from the real binary output. Low-regret: the config
+  is the standard `mcpServers` shape a community extension also reads, so swappable.
+- [x] **Relabel** the mirror-write message `mirrored persona X` → `generated X` (it now covers
+  commands + MCP configs + extensions, not just personas).
 
 ## Now — lock the design
 - [x] Agree thesis: opinionated, self-enforcing evolution of buckle's hub-and-spoke

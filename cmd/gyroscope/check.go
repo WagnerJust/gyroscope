@@ -85,7 +85,7 @@ func newCheckCmd(stdout io.Writer) *cobra.Command {
 					return errCannotRun(err)
 				}
 				for _, dest := range written {
-					fmt.Fprintf(stdout, "mirrored persona %s\n", dest)
+					fmt.Fprintf(stdout, "generated %s\n", dest)
 				}
 
 				// Archive completed top-level tasks: move `- [x]` items from the

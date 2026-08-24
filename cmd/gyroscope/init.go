@@ -90,7 +90,7 @@ func newInitCmd(stdout io.Writer) *cobra.Command {
 				return errCannotRun(err)
 			}
 			for _, dest := range written {
-				fmt.Fprintf(stdout, "mirrored persona %s\n", dest)
+				fmt.Fprintf(stdout, "generated %s\n", dest)
 			}
 			// Suppress AI attribution when configured (enforce.aiAttribution=false):
 			// write includeCoAuthoredBy:false into .claude/settings.json.

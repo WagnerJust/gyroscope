@@ -66,3 +66,45 @@ func TestClaudeFile_Deterministic(t *testing.T) {
 		t.Error("ClaudeFile must be deterministic (sorted keys) for byte-equal checks")
 	}
 }
+
+func TestPIConfig_StandardMCPServersShape(t *testing.T) {
+	b, err := PIConfig(sample)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var m map[string]any
+	if err := json.Unmarshal(b, &m); err != nil {
+		t.Fatalf("not valid JSON: %v\n%s", err, b)
+	}
+	servers, ok := m["mcpServers"].(map[string]any)
+	if !ok {
+		t.Fatalf("PI config must use the mcpServers wrapper:\n%s", b)
+	}
+	linear := servers["linear"].(map[string]any)
+	if linear["command"] != "npx" {
+		t.Errorf("stdio command wrong: %v", linear)
+	}
+	if !strings.Contains(string(b), "${LINEAR_KEY}") {
+		t.Errorf("env var ref not preserved:\n%s", b)
+	}
+}
+
+// The generated extension carries the official SDK (pinned) and the registerTool
+// bridge — the shape validated live against pi 0.84.3.
+func TestPIExtensionArtifacts(t *testing.T) {
+	if !strings.Contains(PIExtensionPackageJSON, "@modelcontextprotocol/sdk") {
+		t.Error("package.json must declare the official MCP SDK")
+	}
+	if strings.Contains(PIExtensionPackageJSON, "pi-mcp-extension") || strings.Contains(PIExtensionIndex, "pi-mcp-extension") {
+		t.Error("must not depend on the community wrapper")
+	}
+	for _, want := range []string{"pi.registerTool(", "StdioClientTransport", "mcp_", "listTools()", "session_shutdown"} {
+		if !strings.Contains(PIExtensionIndex, want) {
+			t.Errorf("generated extension missing %q", want)
+		}
+	}
+	// No backticks — it must survive as a Go raw-string constant.
+	if strings.Contains(PIExtensionIndex, "`") {
+		t.Error("extension source must avoid backticks (Go raw-string constant)")
+	}
+}
