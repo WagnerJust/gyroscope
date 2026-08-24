@@ -599,6 +599,58 @@ func TestCheckGeneratesCommandsPerHarness(t *testing.T) {
 	}
 }
 
+// enforce.opencode installs the OpenCode adapter: it merges the non-hub state
+// spokes into opencode.json `instructions`. init writes it, check verifies it,
+// removing the key drifts, --fix restores it.
+func TestCheckOpenCodeInstructionsAdapter(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "gyroscope.json"), []byte(`{"enforce":{"opencode":true}}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	var out, errb bytes.Buffer
+	if err := run([]string{"init", dir, "--apply"}, &out, &errb); err != nil {
+		t.Fatalf("init --apply: %v (%s)", err, errb.String())
+	}
+	fillPlaceholders(t, dir)
+
+	oc := filepath.Join(dir, "opencode.json")
+	b, err := os.ReadFile(oc)
+	if err != nil || !strings.Contains(string(b), "instructions") || !strings.Contains(string(b), "TODO.md") {
+		t.Fatalf("opencode.json should carry instructions incl TODO.md, got err=%v\n%s", err, b)
+	}
+	if strings.Contains(string(b), "AGENTS.md") {
+		t.Errorf("AGENTS.md must not be in instructions (native read):\n%s", b)
+	}
+
+	out.Reset()
+	errb.Reset()
+	if err := run([]string{"check", dir}, &out, &errb); err != nil {
+		t.Fatalf("check should pass with the OpenCode adapter installed, got %v\n%s", err, out.String())
+	}
+
+	// Drop the instructions key → drift; --fix restores.
+	if err := os.WriteFile(oc, []byte(`{"model":"anthropic/x"}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	out.Reset()
+	errb.Reset()
+	if code := exitCodeOf(t, run([]string{"check", dir}, &out, &errb)); code != exitDrift {
+		t.Fatalf("removing opencode instructions should drift, got code %d", code)
+	}
+	if !strings.Contains(out.String(), "opencode") {
+		t.Fatalf("drift should name the opencode adapter, got: %s", out.String())
+	}
+	out.Reset()
+	errb.Reset()
+	if err := run([]string{"check", "--fix", dir}, &out, &errb); err != nil {
+		t.Fatalf("check --fix: %v\n%s", err, out.String())
+	}
+	// --fix preserved the user's model key while re-adding instructions.
+	if b, _ := os.ReadFile(oc); !strings.Contains(string(b), "anthropic/x") || !strings.Contains(string(b), "TODO.md") {
+		t.Fatalf("--fix should merge, preserving the user key:\n%s", b)
+	}
+}
+
 func TestCheckOnStateRequiresPersonaFile(t *testing.T) {
 	dir := initAndFill(t)
 	var out, errb bytes.Buffer

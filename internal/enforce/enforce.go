@@ -20,4 +20,5 @@ var (
 	_ Adapter = Claude{}
 	_ Adapter = PI{}
 	_ Adapter = Cursor{}
+	_ Adapter = OpenCode{}
 )
