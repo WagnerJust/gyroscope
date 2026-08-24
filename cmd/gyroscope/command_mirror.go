@@ -51,5 +51,9 @@ func planMirrors(repoDir string, cfg config.Config) ([]persona.Mirror, error) {
 	if err != nil {
 		return nil, err
 	}
-	return append(p, c...), nil
+	m, err := planMCPMirrors(repoDir, cfg)
+	if err != nil {
+		return nil, err
+	}
+	return append(append(p, c...), m...), nil
 }

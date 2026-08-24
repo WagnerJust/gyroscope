@@ -26,6 +26,14 @@ type Config struct {
 	// it "syncs if it hasn't been." The alternative to committing the generated dirs
 	// (the ship-to-team note). See ADR 0018.
 	Sync bool `json:"sync"`
+	// MCP is the neutral declaration of shared MCP servers, keyed by name. gyroscope
+	// re-encodes it into each enabled harness's MCP config (Claude `.mcp.json`,
+	// OpenCode `opencode.json` `mcp`, PI `.pi/mcp.json`). A server is stdio/local when
+	// it has a Command, remote when it has a URL. Values should reference `${ENV_VAR}`
+	// rather than raw secrets — every target expands env vars — so the generated
+	// configs are safe to commit and to bake into the sync script. Absent means the
+	// feature is off (nothing written).
+	MCP map[string]MCPServer `json:"mcp"`
 	// CodeReview is an opt-in persona PRESET (default false): instead of the
 	// from-scratch persona interview, the /gyroscope skill scaffolds a curated
 	// multi-persona code-review bundle — layer-aligned reviewer personas
@@ -69,6 +77,21 @@ type CustomSpoke struct {
 	Name string `json:"name"`
 	Dest string `json:"dest"`
 }
+
+// MCPServer is one neutral MCP server declaration. A non-empty Command is a
+// stdio/local server (Args/Env apply); a non-empty URL is a remote server
+// (Headers apply). Values may contain `${ENV_VAR}` references, passed through
+// verbatim for the target to expand.
+type MCPServer struct {
+	Command string            `json:"command,omitempty"`
+	Args    []string          `json:"args,omitempty"`
+	Env     map[string]string `json:"env,omitempty"`
+	URL     string            `json:"url,omitempty"`
+	Headers map[string]string `json:"headers,omitempty"`
+}
+
+// Remote reports whether s is a remote (URL) server rather than stdio/local.
+func (s MCPServer) Remote() bool { return s.URL != "" }
 
 // PersonaState is the lifecycle of the docs/agents/ personas spoke. Only
 // PersonaUnknown triggers the hub's "ask the user" directive; the rest are silent.

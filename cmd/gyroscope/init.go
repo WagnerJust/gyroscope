@@ -97,6 +97,11 @@ func newInitCmd(stdout io.Writer) *cobra.Command {
 			if err := applyAttribution(stdout, abs, cfg); err != nil {
 				return err
 			}
+			// Merge declared MCP servers into OpenCode's shared opencode.json (Claude's
+			// dedicated .mcp.json rode planMirrors above).
+			if err := applyMCP(stdout, abs, cfg); err != nil {
+				return err
+			}
 			// When sync is enabled, write the committed reconstruction script so a
 			// teammate who gitignores the generated dirs can rebuild the registrations.
 			if err := applySyncScript(stdout, abs, cfg); err != nil {

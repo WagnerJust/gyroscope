@@ -1,6 +1,9 @@
 package enforce
 
 import (
+	"bytes"
+	"encoding/json"
+	"os"
 	"path/filepath"
 	"strings"
 )
@@ -110,4 +113,81 @@ func hasOpenCodeInstructions(repoDir string, want []string) (bool, error) {
 		}
 	}
 	return true, nil
+}
+
+// SetOpenCodeMCP merges gyroscope's declared MCP servers (want, keyed by name, each a
+// pre-rendered OpenCode server object) into opencode.json's `mcp` key, overwriting an
+// entry gyroscope owns by name and preserving every other `mcp` entry and top-level
+// key. Returns changed=false when the config is already current. Servers the user
+// removes from gyroscope.json are NOT pruned here (gyroscope only owns names it
+// currently declares) — a documented shared-config limitation, unlike the dedicated
+// .mcp.json which is regenerated whole.
+func SetOpenCodeMCP(repoDir string, want map[string]any) (changed bool, err error) {
+	path := filepath.Join(repoDir, opencodeConfigPath)
+	orig, rerr := os.ReadFile(path)
+	if rerr != nil && !os.IsNotExist(rerr) {
+		return false, rerr
+	}
+	settings, err := readSettings(path)
+	if err != nil {
+		return false, err
+	}
+	cur, _ := settings["mcp"].(map[string]any)
+	if cur == nil {
+		cur = map[string]any{}
+	}
+	for name, srv := range want {
+		cur[name] = srv
+	}
+	settings["mcp"] = cur
+	next, err := marshalSettings(settings)
+	if err != nil {
+		return false, err
+	}
+	if bytes.Equal(next, orig) {
+		return false, nil
+	}
+	tmp := path + ".gyroscope.tmp"
+	if err := os.WriteFile(tmp, next, 0o644); err != nil {
+		return false, err
+	}
+	if err := os.Rename(tmp, path); err != nil {
+		os.Remove(tmp)
+		return false, err
+	}
+	return true, nil
+}
+
+// OpenCodeMCPMatches reports whether each declared server in want is present in
+// opencode.json's `mcp` and byte-identical after JSON normalization (which reconciles
+// []string vs []any and key order). Other entries are ignored. The read-only inverse
+// of SetOpenCodeMCP.
+func OpenCodeMCPMatches(repoDir string, want map[string]any) (bool, error) {
+	settings, err := readSettings(filepath.Join(repoDir, opencodeConfigPath))
+	if err != nil {
+		return false, err
+	}
+	cur, _ := settings["mcp"].(map[string]any)
+	for name, srv := range want {
+		a, _ := json.Marshal(cur[name])
+		b, _ := json.Marshal(srv)
+		if !bytes.Equal(a, b) {
+			return false, nil
+		}
+	}
+	return true, nil
+}
+
+// marshalSettings renders a settings object the same way writeSettings persists it —
+// indented, HTML-escaping off — so callers can diff the would-be output against the
+// file on disk for change detection.
+func marshalSettings(settings map[string]any) ([]byte, error) {
+	var buf bytes.Buffer
+	enc := json.NewEncoder(&buf)
+	enc.SetEscapeHTML(false)
+	enc.SetIndent("", "  ")
+	if err := enc.Encode(settings); err != nil {
+		return nil, err
+	}
+	return buf.Bytes(), nil
 }

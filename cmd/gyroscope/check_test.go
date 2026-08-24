@@ -651,6 +651,69 @@ func TestCheckOpenCodeInstructionsAdapter(t *testing.T) {
 	}
 }
 
+// A neutral mcp block re-encodes into Claude's dedicated .mcp.json (a gyroscope-owned
+// mirror) and merges into OpenCode's shared opencode.json `mcp`. check verifies both;
+// drift in either is caught and --fix restores it.
+func TestCheckMCPClaudeAndOpenCode(t *testing.T) {
+	dir := t.TempDir()
+	cfg := `{"enforce":{"claude":true,"opencode":true},"mcp":{"linear":{"command":"npx","args":["-y","linear-mcp"],"env":{"K":"${LINEAR_KEY}"}}}}`
+	if err := os.WriteFile(filepath.Join(dir, "gyroscope.json"), []byte(cfg), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	var out, errb bytes.Buffer
+	if err := run([]string{"init", dir, "--apply"}, &out, &errb); err != nil {
+		t.Fatalf("init --apply: %v (%s)", err, errb.String())
+	}
+	fillPlaceholders(t, dir)
+
+	// Claude dedicated file, generated + env-var preserved.
+	mcpFile := filepath.Join(dir, ".mcp.json")
+	if b, err := os.ReadFile(mcpFile); err != nil || !strings.Contains(string(b), "mcpServers") || !strings.Contains(string(b), "${LINEAR_KEY}") {
+		t.Fatalf(".mcp.json should be generated with the env ref, got err=%v\n%s", err, b)
+	}
+	// OpenCode shared config, merged local server.
+	if b, err := os.ReadFile(filepath.Join(dir, "opencode.json")); err != nil || !strings.Contains(string(b), `"mcp"`) || !strings.Contains(string(b), "linear") {
+		t.Fatalf("opencode.json should carry the merged mcp server, got err=%v\n%s", err, b)
+	}
+
+	out.Reset()
+	errb.Reset()
+	if err := run([]string{"check", dir}, &out, &errb); err != nil {
+		t.Fatalf("check should pass with MCP generated, got %v\n%s", err, out.String())
+	}
+
+	// Corrupt the OpenCode mcp entry → drift; --fix restores.
+	if err := os.WriteFile(filepath.Join(dir, "opencode.json"), []byte(`{"mcp":{"linear":{"type":"local","command":["wrong"]}}}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	out.Reset()
+	errb.Reset()
+	if code := exitCodeOf(t, run([]string{"check", dir}, &out, &errb)); code != exitDrift {
+		t.Fatalf("altered opencode mcp should drift, got code %d", code)
+	}
+	if !strings.Contains(out.String(), "opencode.json") {
+		t.Fatalf("drift should name opencode.json, got: %s", out.String())
+	}
+	out.Reset()
+	errb.Reset()
+	if err := run([]string{"check", "--fix", dir}, &out, &errb); err != nil {
+		t.Fatalf("check --fix: %v\n%s", err, out.String())
+	}
+	if err := run([]string{"check", dir}, &out, &errb); err != nil {
+		t.Fatalf("check should pass after --fix, got %v", err)
+	}
+
+	// Removing the Claude dedicated file drifts too (it's a generated mirror).
+	if err := os.Remove(mcpFile); err != nil {
+		t.Fatal(err)
+	}
+	out.Reset()
+	errb.Reset()
+	if code := exitCodeOf(t, run([]string{"check", dir}, &out, &errb)); code != exitDrift {
+		t.Fatalf("missing .mcp.json should drift, got code %d", code)
+	}
+}
+
 func TestCheckOnStateRequiresPersonaFile(t *testing.T) {
 	dir := initAndFill(t)
 	var out, errb bytes.Buffer

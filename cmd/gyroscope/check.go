@@ -15,6 +15,7 @@ import (
 	"github.com/WagnerJust/gyroscope/internal/config"
 	"github.com/WagnerJust/gyroscope/internal/enforce"
 	"github.com/WagnerJust/gyroscope/internal/fsutil"
+	"github.com/WagnerJust/gyroscope/internal/mcp"
 	"github.com/WagnerJust/gyroscope/internal/persona"
 	"github.com/WagnerJust/gyroscope/internal/standard"
 	"github.com/WagnerJust/gyroscope/internal/target"
@@ -105,6 +106,10 @@ func newCheckCmd(stdout io.Writer) *cobra.Command {
 				// Suppress AI attribution when configured (enforce.aiAttribution=false):
 				// converge includeCoAuthoredBy:false into .claude/settings.json.
 				if err := applyAttribution(stdout, abs, cfg); err != nil {
+					return err
+				}
+				// Merge declared MCP servers into opencode.json (OpenCode's shared config).
+				if err := applyMCP(stdout, abs, cfg); err != nil {
 					return err
 				}
 				// Regenerate the sync script (when enabled) from the current mirror plan.
@@ -462,6 +467,19 @@ func checkRepo(repoDir string, cfg config.Config) (problems, notes []string, err
 			return nil, nil, err
 		} else if !bytes.Equal(got, content) {
 			problems = append(problems, syncScriptPath+": sync script differs from the standard (run `gyroscope check --fix`)")
+		}
+	}
+
+	// MCP: OpenCode's servers live in the shared opencode.json `mcp` key (Claude's
+	// dedicated .mcp.json is verified byte-for-byte by the generated-file loop above).
+	// Each declared server must be present and current; `check --fix` merges it.
+	if len(cfg.MCP) > 0 && cfg.Enforce.OpenCode {
+		ok, err := enforce.OpenCodeMCPMatches(repoDir, mcp.OpenCodeServers(cfg.MCP))
+		if err != nil {
+			return nil, nil, err
+		}
+		if !ok {
+			problems = append(problems, "opencode.json: declared MCP servers missing or altered in `mcp` (run `gyroscope check --fix`)")
 		}
 	}
 
