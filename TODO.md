@@ -8,7 +8,8 @@
 **Legend:** `[ ]` not started · `[~] `in progress · `[x]` done (then move to `DONE.md`)
 
 ## Next
-- (all build-tracker "Next" items complete — see `DONE.md`. Cross-harness artifact sync is done across all 6 phases and live-validated on opencode + pi.)
+- [ ] **`install-skill` ignores `$CLAUDE_CONFIG_DIR` — installs to the wrong Claude when two are configured.** `gyroscope install-skill` defaults to `~/.claude/skills` and never consults `CLAUDE_CONFIG_DIR`, so anyone running a second Claude (e.g. `CLAUDE_CONFIG_DIR=$HOME/.claude-personal claude`, the standard work/personal split) silently installs the skill into the *other* agent's config and it never appears in the sessions they meant it for. Confirmed 2026-08-26: a personal-config session could not see the gyroscope skill at all — it had to be read off disk by path. **Fix:** default to `${CLAUDE_CONFIG_DIR:-$HOME/.claude}/skills`; the explicit `[skills-dir]` positional keeps overriding. Cheap, and the failure is silent, which is the argument for doing it. Same defect in `buckle install` (`~/Side/buckle`, no TODO.md yet) and in Scott's `plumbline install-skill --global`, which writes under `$HOME` on the same assumption — worth an upstream issue there rather than a local fix.
+- (all previous build-tracker "Next" items complete — see `DONE.md`. Cross-harness artifact sync is done across all 6 phases and live-validated on opencode + pi.)
 
 ## Known non-issues (kept for context; not action items)
 - [ ] (note, not fixed) `go build ./cmd/gyroscope` reports `dev (commit none, built unknown)` — no ldflags; `make build` is the versioned path. Expected, documented as the "quick local binary."
