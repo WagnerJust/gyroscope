@@ -268,7 +268,7 @@ into every enabled harness (ADR 0019): `.claude/commands/<name>.md`,
 `.opencode/commands/<name>.md`, `.pi/prompts/<name>.md` — dispatchable as `/name`
 everywhere. Write the canonical file in the **Claude command format** (the superset):
 optional YAML frontmatter (`description`, `argument-hint`, `allowed-tools`, `model`)
-plus the prompt body. The body syntax is portable — `$ARGUMENTS`/`$1`, `` !`cmd` ``
+plus the prompt body. The body syntax is portable — `$ARGUMENTS`/`$1`, bang-backtick
 shell injection, `@file` references all work in every target — so only the frontmatter
 is reduced per harness (OpenCode keeps `description`; PI keeps `description` +
 `argument-hint`; Claude-only keys are dropped, not mistranslated).
