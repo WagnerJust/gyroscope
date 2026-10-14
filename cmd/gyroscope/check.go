@@ -65,7 +65,7 @@ func newCheckCmd(stdout io.Writer) *cobra.Command {
 				}
 				items := classify(abs, files)
 				adapters := enabledAdapters(cfg)
-				paths := hookPathsFor(cfg)
+				paths := injectPathsFor(cfg)
 				// force=false: create NEW files, merge the hub's managed region, and
 				// leave conflicts untouched (they surface as drift in the re-check
 				// below). --fix never clobbers user content.
@@ -178,7 +178,7 @@ func archiveDone(repoDir string) (int, error) {
 }
 
 // archiveNudgeThreshold is the count of completed `[x]` items in TODO.md above
-// which check emits the archive nudge. TODO.md is catted into every session, so a
+// which check emits the archive nudge. TODO.md is injected into every session, so a
 // pile of done items is dead weight in the per-session context; past this many the
 // heuristic tells the user to move them to DONE.md. A handful is tolerated (the
 // legend line and an in-flight item's just-finished sub-tasks), so the bar is
@@ -192,7 +192,7 @@ const archiveNudgeThreshold = 5
 // (I/O, malformed settings) — a can't-run condition distinct from drift.
 //
 // It is the read-only inverse of init: it reuses standard.Plan, standard.Routes,
-// target.All/target.RoutingLine, hookPathsFor and enforce.SessionStartCommand
+// target.All/target.RoutingLine, injectPathsFor and the enforce adapters
 // rather than re-deriving any of them.
 func checkRepo(repoDir string, cfg config.Config) (problems, notes []string, err error) {
 	exists := func(rel string) bool {
@@ -404,7 +404,7 @@ func checkRepo(repoDir string, cfg config.Config) (problems, notes []string, err
 	}
 
 	// 5. Every enabled enforcement adapter's mechanism is installed and current.
-	paths := hookPathsFor(cfg)
+	paths := injectPathsFor(cfg)
 	for _, a := range enabledAdapters(cfg) {
 		installed, err := a.Verify(repoDir, paths)
 		if err != nil {

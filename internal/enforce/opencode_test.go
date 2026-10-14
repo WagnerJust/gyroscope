@@ -21,8 +21,11 @@ func readOpenCode(t *testing.T, dir string) map[string]any {
 }
 
 func TestOpenCodeInjectPathsDropsHubAndLocal(t *testing.T) {
-	got := opencodeInjectPaths([]string{"AGENTS.md", "docs/agents.md", "TODO.md", ".local/todo.md", "gyroscope.json"})
-	want := []string{"docs/agents.md", "TODO.md", "gyroscope.json"}
+	got := opencodeInjectPaths(Paths{
+		Rules: []string{"AGENTS.md", "docs/agents.md"},
+		State: []string{"gyroscope.json", "TODO.md", ".local/todo.md", ".local/local.md"},
+	})
+	want := []string{"docs/agents.md", "gyroscope.json", "TODO.md"}
 	if len(got) != len(want) {
 		t.Fatalf("got %v, want %v", got, want)
 	}
@@ -41,7 +44,7 @@ func TestOpenCodeApplyMergesPreservingOtherKeys(t *testing.T) {
 		t.Fatal(err)
 	}
 	a := OpenCode{}
-	paths := []string{"AGENTS.md", "TODO.md", "docs/agents.md"}
+	paths := Paths{Rules: []string{"AGENTS.md", "docs/agents.md"}, State: []string{"TODO.md"}}
 	changed, err := a.Apply(dir, paths)
 	if err != nil || !changed {
 		t.Fatalf("Apply: changed=%v err=%v", changed, err)
@@ -77,7 +80,7 @@ func TestOpenCodeApplyMergesPreservingOtherKeys(t *testing.T) {
 func TestOpenCodeVerifyFalseWhenMissing(t *testing.T) {
 	dir := t.TempDir()
 	a := OpenCode{}
-	if ok, err := a.Verify(dir, []string{"TODO.md"}); err != nil || ok {
+	if ok, err := a.Verify(dir, Paths{State: []string{"TODO.md"}}); err != nil || ok {
 		t.Fatalf("absent opencode.json should verify false: ok=%v err=%v", ok, err)
 	}
 }

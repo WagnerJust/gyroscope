@@ -152,7 +152,7 @@ func conflicts(items []convergeItem) []string {
 //
 // It is shared by `init --apply` and `check --fix` so detect and converge stay
 // symmetric.
-func applyConverge(stdout io.Writer, abs string, items []convergeItem, adapters []enforce.Adapter, paths []string, force bool) (skipped []string, err error) {
+func applyConverge(stdout io.Writer, abs string, items []convergeItem, adapters []enforce.Adapter, paths enforce.Paths, force bool) (skipped []string, err error) {
 	wroteLocal := false
 	for _, it := range items {
 		switch it.State {

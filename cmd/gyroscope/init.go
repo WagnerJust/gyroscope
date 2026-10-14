@@ -37,7 +37,7 @@ func newInitCmd(stdout io.Writer) *cobra.Command {
 			if err != nil {
 				return errCannotRun(err)
 			}
-			paths := hookPathsFor(cfg)
+			paths := injectPathsFor(cfg)
 			adapters := enabledAdapters(cfg)
 			items := classify(abs, files)
 			// Generated files: persona registrations (docs/agents/ → each harness's
@@ -123,30 +123,28 @@ func newInitCmd(stdout io.Writer) *cobra.Command {
 	return cmd
 }
 
-// hookPathsFor returns the repo-relative files the SessionStart hook should cat:
-// always the hub, plus the agents-instructions spoke, the state files (so a
-// fresh session resumes from current progress), and the local-notes spoke, when
-// each is enabled. The context/adr/personas/contributing spokes are not catted
-// by the hook — they are read on demand via the hub's routes. gyroscope.json is
-// catted when personas are enabled, so the live personas state is in session
-// context for the hub's personas directive.
-func hookPathsFor(cfg config.Config) []string {
-	paths := []string{"AGENTS.md"}
+// injectPathsFor splits the repo-relative files each enforcement adapter
+// delivers into two channels. Rules are static: always the hub, plus the agents
+// spoke when enabled. State is the dynamic working state a fresh session resumes
+// from: gyroscope.json when personas are enabled (the hub's personas directive
+// branches on its live state), the state files, and the local-notes spoke. The
+// context/adr/personas/contributing spokes are in neither — they are read on
+// demand via the hub's routes, and DONE.md is routed, never injected.
+func injectPathsFor(cfg config.Config) enforce.Paths {
+	p := enforce.Paths{Rules: []string{"AGENTS.md"}}
 	if cfg.Spokes.Agents {
-		paths = append(paths, "docs/agents.md")
-	}
-	if cfg.Spokes.State {
-		paths = append(paths, "TODO.md", ".local/todo.md")
-	}
-	if cfg.Spokes.Local {
-		paths = append(paths, ".local/local.md")
+		p.Rules = append(p.Rules, "docs/agents.md")
 	}
 	if cfg.Spokes.Personas.Enabled() {
-		// The hub's personas directive branches on spokes.personas; cat the config
-		// so the live state is in session context (the hook stays pure `cat`).
-		paths = append(paths, "gyroscope.json")
+		p.State = append(p.State, "gyroscope.json")
 	}
-	return paths
+	if cfg.Spokes.State {
+		p.State = append(p.State, "TODO.md", ".local/todo.md")
+	}
+	if cfg.Spokes.Local {
+		p.State = append(p.State, ".local/local.md")
+	}
+	return p
 }
 
 // enabledAdapters returns the enforcement adapters cfg turns on, in a stable
