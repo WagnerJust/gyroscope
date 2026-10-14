@@ -68,8 +68,10 @@ Kept separate from enforcement because most tools cannot run hooks.
 _Avoid:_ enforcement adapter (the other, separate registry).
 
 ### Enforcement adapter
-`internal/enforce`: an adapter for one of the *few* harnesses that can run a hook
-to make agents actually read the hub (Claude now, PI later).
+`internal/enforce`: an adapter for one of the *few* harnesses that have a native
+mechanism gyroscope can install — a hook, an extension, an always-apply rule, an
+import — to make agents actually encounter the hub and the state (Claude, PI,
+OpenCode, Codex, Cursor today).
 _Avoid:_ doc target (far more tools, pointer-only, no enforcement).
 
 ### SessionStart hook
