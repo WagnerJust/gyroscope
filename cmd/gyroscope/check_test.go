@@ -10,8 +10,10 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/WagnerJust/gyroscope/internal/config"
 	"github.com/WagnerJust/gyroscope/internal/enforce"
 	"github.com/WagnerJust/gyroscope/internal/standard"
+	"github.com/WagnerJust/gyroscope/internal/target"
 )
 
 // placeholderRE matches a fill-once {{...}} scaffold marker, including one that
@@ -106,6 +108,104 @@ func TestCheckFailsOnCorruptPointer(t *testing.T) {
 	}
 	if !strings.Contains(out.String(), "CLAUDE.md") {
 		t.Fatalf("drift report should name the corrupt pointer, got: %s", out.String())
+	}
+}
+
+func TestCheckFixUpgradesLegacyClaudePointer(t *testing.T) {
+	dir := initAndFill(t)
+	if err := os.WriteFile(filepath.Join(dir, "CLAUDE.md"), []byte(target.RoutingLine), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	var out, errb bytes.Buffer
+	err := run([]string{"check", dir}, &out, &errb)
+	if code := exitCodeOf(t, err); code != exitDrift {
+		t.Fatalf("a legacy CLAUDE.md is drift, got code %d (%v)", code, err)
+	}
+	if !strings.Contains(out.String(), "CLAUDE.md: pointer does not import the hub (`@AGENTS.md`); run `gyroscope check --fix`") {
+		t.Fatalf("drift should explain the upgrade, got: %s", out.String())
+	}
+
+	out.Reset()
+	if err := run([]string{"check", dir, "--fix"}, &out, &errb); err != nil {
+		t.Fatalf("--fix should upgrade the legacy pointer and pass, got %v\n%s", err, out.String())
+	}
+	b, _ := os.ReadFile(filepath.Join(dir, "CLAUDE.md"))
+	tgt, _ := target.ByID("claude")
+	if string(b) != string(tgt.Body(config.Default())) {
+		t.Fatalf("CLAUDE.md after --fix = %q, want the @import body", b)
+	}
+}
+
+func TestCheckFixLeavesCustomClaudePointer(t *testing.T) {
+	dir := initAndFill(t)
+	custom := target.RoutingLine + "\nmy own rules\n"
+	if err := os.WriteFile(filepath.Join(dir, "CLAUDE.md"), []byte(custom), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	var out, errb bytes.Buffer
+	err := run([]string{"check", dir, "--fix"}, &out, &errb)
+	if code := exitCodeOf(t, err); code != exitDrift {
+		t.Fatalf("custom CLAUDE.md is a conflict --fix must not touch, got code %d (%v)", code, err)
+	}
+	if b, _ := os.ReadFile(filepath.Join(dir, "CLAUDE.md")); string(b) != custom {
+		t.Fatalf("--fix clobbered custom content: %q", b)
+	}
+	if !strings.Contains(out.String(), "relocate custom content into AGENTS.md or a spoke") {
+		t.Fatalf("drift should point at relocating custom content, got: %s", out.String())
+	}
+}
+
+// User content below the imports is allowed: only the import lines are checked.
+func TestCheckAllowsContentBelowClaudeImports(t *testing.T) {
+	dir := initAndFill(t)
+	p := filepath.Join(dir, "CLAUDE.md")
+	b, _ := os.ReadFile(p)
+	if err := os.WriteFile(p, append(b, []byte("\n## Local extras\n\nsomething\n")...), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	var out, errb bytes.Buffer
+	if err := run([]string{"check", dir}, &out, &errb); err != nil {
+		t.Fatalf("extra content below the imports should pass, got %v\n%s", err, out.String())
+	}
+}
+
+func TestCheckRequiresAgentsImportWhenAgentsOn(t *testing.T) {
+	dir := initAndFill(t)
+	tgt, _ := target.ByID("claude")
+	cfg := config.Default()
+	cfg.Spokes.Agents = false
+	// The agents-off body: hub import only.
+	if err := os.WriteFile(filepath.Join(dir, "CLAUDE.md"), tgt.Body(cfg), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	var out, errb bytes.Buffer
+	err := run([]string{"check", dir}, &out, &errb)
+	if code := exitCodeOf(t, err); code != exitDrift {
+		t.Fatalf("missing @docs/agents.md with agents on is drift, got code %d (%v)", code, err)
+	}
+	if !strings.Contains(out.String(), "`@docs/agents.md`") {
+		t.Fatalf("drift should name the missing import, got: %s", out.String())
+	}
+}
+
+func TestInitAgentsOffClaudeBodyHasTwoLines(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "gyroscope.json"), []byte(`{"spokes":{"agents":false}}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	var out, errb bytes.Buffer
+	if err := run([]string{"init", dir, "--apply"}, &out, &errb); err != nil {
+		t.Fatalf("init --apply: %v (%s)", err, errb.String())
+	}
+	b, _ := os.ReadFile(filepath.Join(dir, "CLAUDE.md"))
+	lines := strings.Split(strings.TrimSuffix(string(b), "\n"), "\n")
+	if len(lines) != 2 || lines[1] != "@AGENTS.md" {
+		t.Fatalf("agents-off CLAUDE.md should be header + @AGENTS.md, got %q", b)
+	}
+	fillPlaceholders(t, dir)
+	out.Reset()
+	if err := run([]string{"check", dir}, &out, &errb); err != nil {
+		t.Fatalf("agents-off repo should be conformant, got %v\n%s", err, out.String())
 	}
 }
 

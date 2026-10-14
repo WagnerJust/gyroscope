@@ -349,8 +349,8 @@ func TestInitApplyRefusesConflictWithoutForce(t *testing.T) {
 	if err := run([]string{"init", dir, "--apply", "--force"}, &out, &errb); err != nil {
 		t.Fatalf("--force should resolve the conflict, got %v (%s)", err, errb.String())
 	}
-	if b, _ := os.ReadFile(filepath.Join(dir, "CLAUDE.md")); !strings.Contains(string(b), "read AGENTS.md") {
-		t.Fatal("--force should have written the canonical routing line")
+	if b, _ := os.ReadFile(filepath.Join(dir, "CLAUDE.md")); !strings.Contains(string(b), "\n@AGENTS.md\n") {
+		t.Fatal("--force should have written the canonical @import pointer")
 	}
 }
 

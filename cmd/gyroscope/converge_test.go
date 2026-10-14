@@ -9,6 +9,7 @@ import (
 
 	"github.com/WagnerJust/gyroscope/internal/config"
 	"github.com/WagnerJust/gyroscope/internal/standard"
+	"github.com/WagnerJust/gyroscope/internal/target"
 )
 
 // stateOf returns the classified state for dest, failing if it is not present.
@@ -129,5 +130,36 @@ func TestClassifyMergeOnMarkerlessHub(t *testing.T) {
 	}
 	if c := conflicts(items); len(c) != 0 {
 		t.Fatalf("a markerless hub must not be a CONFLICT, got conflicts: %v", c)
+	}
+}
+
+// A CLAUDE.md that is byte-for-byte the legacy routing line is gyroscope-written
+// by construction, so upgrading it to the @import body is a MERGE, not a CONFLICT.
+func TestClassifyLegacyClaudePointerIsMerge(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "CLAUDE.md"), []byte(target.RoutingLine), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	items, err := classifyAll(dir, config.Default())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if s := stateOf(t, items, "CLAUDE.md"); s != stateMerge {
+		t.Fatalf("legacy routing-line CLAUDE.md should be MERGE, got %s", s)
+	}
+}
+
+// The routing line plus anything else is user content: still a CONFLICT.
+func TestClassifyCustomClaudePointerStaysConflict(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "CLAUDE.md"), []byte(target.RoutingLine+"\nmy own rules\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	items, err := classifyAll(dir, config.Default())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if s := stateOf(t, items, "CLAUDE.md"); s != stateConflict {
+		t.Fatalf("CLAUDE.md with custom content should stay CONFLICT, got %s", s)
 	}
 }

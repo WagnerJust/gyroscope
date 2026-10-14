@@ -39,7 +39,7 @@ func newInitCmd(stdout io.Writer) *cobra.Command {
 			}
 			paths := injectPathsFor(cfg)
 			adapters := enabledAdapters(cfg)
-			items := classify(abs, files)
+			items := classify(abs, files, cfg)
 			// Generated files: persona registrations (docs/agents/ → each harness's
 			// subagent registry) + command re-encodings (docs/commands/ → each
 			// harness's command dir). Gated per harness by enforce.*.

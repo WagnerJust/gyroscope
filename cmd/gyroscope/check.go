@@ -63,7 +63,7 @@ func newCheckCmd(stdout io.Writer) *cobra.Command {
 				if err != nil {
 					return errCannotRun(err)
 				}
-				items := classify(abs, files)
+				items := classify(abs, files, cfg)
 				adapters := enabledAdapters(cfg)
 				paths := injectPathsFor(cfg)
 				// force=false: create NEW files, merge the hub's managed region, and
@@ -374,7 +374,11 @@ func checkRepo(repoDir string, cfg config.Config) (problems, notes []string, err
 		}
 	}
 
-	// 4. Every pointer file exists and carries the canonical routing line.
+	// 4. Every pointer file exists and defers to the hub. CLAUDE.md must import it
+	// (whole `@AGENTS.md` line, plus `@docs/agents.md` when the agents spoke is on),
+	// since Claude Code skips its native AGENTS.md read once a CLAUDE.md exists;
+	// user content below the imports is allowed. Every other pointer carries the
+	// routing line.
 	for _, t := range target.All() {
 		if !exists(t.Path) {
 			problems = append(problems, fmt.Sprintf("%s: pointer file missing (run `gyroscope init`)", t.Path))
@@ -384,8 +388,17 @@ func checkRepo(repoDir string, cfg config.Config) (problems, notes []string, err
 		if err != nil {
 			return nil, nil, err
 		}
-		if !strings.Contains(string(b), target.RoutingLine) {
-			problems = append(problems, fmt.Sprintf("%s: pointer file does not contain the canonical routing line", t.Path))
+		if t.ID != "claude" {
+			if !strings.Contains(string(b), target.RoutingLine) {
+				problems = append(problems, fmt.Sprintf("%s: pointer file does not contain the canonical routing line", t.Path))
+			}
+			continue
+		}
+		lines := lineSet(string(b))
+		if _, ok := lines["@AGENTS.md"]; !ok {
+			problems = append(problems, t.Path+": pointer does not import the hub (`@AGENTS.md`); run `gyroscope check --fix` to upgrade a legacy routing-line pointer, or relocate custom content into AGENTS.md or a spoke")
+		} else if _, ok := lines["@docs/agents.md"]; cfg.Spokes.Agents && !ok {
+			problems = append(problems, t.Path+": pointer does not import the agents spoke (`@docs/agents.md`); add the line, or run `gyroscope check --fix` to upgrade a legacy routing-line pointer")
 		}
 	}
 
