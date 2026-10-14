@@ -10,8 +10,9 @@ opinionated hub-and-spoke doc set (`AGENTS.md` hub, `CONTEXT.md` glossary,
 `docs/agents.md` instructions, `docs/adr/`, `docs/agents/` personas), the L2 process
 artifacts (`CONTRIBUTING.md` routed from the hub, plus `.github/pull_request_template.md`
 and `.gitmessage`, which Git/GitHub apply directly), the state files (`TODO.md` +
-gitignored `.local/todo.md`), and a `SessionStart` hook that injects the hub +
-instructions + current state every session, so a fresh chat resumes where the last
+gitignored `.local/todo.md`), a `CLAUDE.md` that imports the hub and `docs/agents.md`
+so Claude Code loads the rules in full at launch, and a budgeted `SessionStart` hook
+that injects the current state every session, so a fresh chat resumes where the last
 one stopped. The `gyroscope` binary does the writing — this skill gathers what it
 needs, reconciles what already exists, and hands off.
 
@@ -57,9 +58,11 @@ Placeholders: `{{...}}` are yours to fill in step 3; `<...>` form fields in
 ## Present, then install, then fill
 
 1. Show the gathered answers and the exact list of files to be written. Get approval.
-2. Run the binary to write the standard, reconcile pointer files to the one routing
-   line, and install the `SessionStart` hook (merged into `.claude/settings.json`,
-   never overwriting existing content). This step shells out to the `gyroscope`
+2. Run the binary to write the standard, reconcile pointer files (`CLAUDE.md` to its
+   `@AGENTS.md` import lines, the rest to the one routing line), and install the
+   `SessionStart` state hook (merged into `.claude/settings.json`, never overwriting
+   existing content; it replaces an earlier gyroscope hook rather than stacking a
+   second). This step shells out to the `gyroscope`
    binary — if `gyroscope` is not on PATH, `install-skill` already warned you and
    printed the `go install` line; run that first, or the write step fails with a
    bare "command not found". `init --apply` is merge-safe: it creates missing
@@ -79,7 +82,12 @@ Placeholders: `{{...}}` are yours to fill in step 3; `<...>` form fields in
 4. **Verify none remain.** `grep -rn '{{' AGENTS.md CONTEXT.md docs/` must come back empty
    (every `{{...}}` is a fill-once placeholder; `<...>` in `TEMPLATE.md` is intentional and
    is not matched). If anything remains, you skipped a spoke — go fill it.
-5. Confirm what landed and where.
+5. **Confirm what landed — and what arrives.** List the files written. Then verify
+   delivery, not installation: in a fresh Claude session run `/context` and confirm
+   `CLAUDE.md` with its `@AGENTS.md` / `@docs/agents.md` imports is listed under
+   Memory files, and that the hook's output shows each state file under its `###`
+   header rather than an "over budget" pointer line. The state budget is 9,000 bytes;
+   `gyroscope check` reports a `TODO.md` too large to ever inject as drift.
 6. **Optional — mention the complement.** gyroscope shapes what agents *read*. If the
    user also finds agent *replies* too verbose (the usual cause of rubber-stamping),
    point them at `caveman` (`github.com/JuliusBrussee/caveman`) — a complementary,
@@ -107,9 +115,11 @@ Converge instead:
    CONFLICT (it prints them and exits with drift). Nothing is destroyed.
 4. **Reconcile each CONFLICT by hand, one at a time** — never a blanket `--force`:
    - **A content-bearing pointer** (e.g. a `CLAUDE.md` that holds real instructions):
-     gyroscope wants it reduced to the one routing line. Relocate its content into
-     the hub or the matching spoke first, then replace the file with the canonical
-     routing line.
+     gyroscope wants it reduced to its pointer form — the `@AGENTS.md` import lines
+     for `CLAUDE.md`, the one routing line for the others. Relocate its content into
+     the hub or the matching spoke first, then let `init --apply` write the pointer.
+     (A `CLAUDE.md` that still holds only the old routing sentence is gyroscope's own
+     output and upgrades automatically.)
    - **`CONTRIBUTING.md` / `.gitmessage` / `.github/pull_request_template.md` /
      `docs/agents/README.md`:** compare the repo's version against gyroscope's. If
      the repo's already satisfies the artifact, keep it (it's fine that it differs);
@@ -128,6 +138,11 @@ Converge instead:
      consolidate it into the root `TODO.md` in the same pass — **never leave two todo
      files.** This mechanical status boundary replaces any prior lean/detailed
      convention (see ADR 0009).
+   - **`TODO.md` over the session budget (`check` reports it as drift):** the hook
+     injects `TODO.md` only while it fits 9,000 bytes, so a long one is never
+     delivered. Reduce each open item to one line — move the narrative (what was
+     tried, why, what it meant) into a `DONE.md` entry or an ADR and leave a pointer
+     — until `check` is green. Do not split it into a second todo file (see above).
 5. **Fill placeholders from what already exists.** On an established repo, prefer the
    repo's own docs/READMEs over interviewing from scratch — pull the one-liner,
    domain terms, and build/test commands from what's there, and only ask the user
@@ -235,9 +250,15 @@ opt-in via `gyroscope.json` `enforce.*` (re-run `gyroscope init --apply` after
 changing them, then `gyroscope check`). Each toggle does what that harness's
 mechanism actually allows — verified per tool, not assumed:
 
-- **`claude`** (default `true`) — merges a `SessionStart` hook into
-  `.claude/settings.json` that cats the hub + key spokes each session, and mirrors
-  personas into `.claude/agents/`.
+- **`claude`** (default `true`) — writes `CLAUDE.md` as an import pointer
+  (`@AGENTS.md`, plus `@docs/agents.md` when the agents spoke is on) so Claude Code
+  loads the hub and conventions in full at launch; merges a `SessionStart` hook into
+  `.claude/settings.json` that injects the state files (`gyroscope.json`, `TODO.md`,
+  `.local/todo.md`, `.local/local.md`) in priority order within a 9,000-byte budget
+  — Claude Code caps hook output at 10,000 characters and delivers only a 2 KB
+  preview past it, so a state file that does not fit is skipped with a one-line
+  pointer; and mirrors personas into `.claude/agents/`. `check` reports a `TODO.md`
+  that can never fit as drift (ADR 0022).
 - **`pi`** — writes `.pi/extensions/gyroscope-context.ts` (a `session_start`
   extension injecting the non-hub state spokes; PI reads `AGENTS.md` natively) and,
   with personas on, `.pi/extensions/gyroscope-personas.ts` (persona subagents).
