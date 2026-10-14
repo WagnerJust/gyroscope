@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"errors"
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -1435,5 +1436,83 @@ func TestAIAttributionHubDirective(t *testing.T) {
 	hub2, _ := os.ReadFile(filepath.Join(dir, "AGENTS.md"))
 	if !strings.Contains(string(hub2), "## AI attribution") {
 		t.Fatalf("--fix should have restored the directive:\n%s", hub2)
+	}
+}
+
+// writeBytes overwrites rel under dir with n bytes of filler, one 50-byte line at
+// a time so line counts stay realistic.
+func writeBytes(t *testing.T, dir, rel string, n int) {
+	t.Helper()
+	line := strings.Repeat("x", 49) + "\n"
+	b := []byte(strings.Repeat(line, n/len(line)) + strings.Repeat("y", n%len(line)))
+	if err := os.MkdirAll(filepath.Dir(filepath.Join(dir, rel)), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, rel), b, 0o644); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestCheckDriftsWhenTODOExceedsSessionBudget(t *testing.T) {
+	dir := initAndFill(t)
+	writeBytes(t, dir, "TODO.md", 9500)
+	var out, errb bytes.Buffer
+	err := run([]string{"check", dir}, &out, &errb)
+	if code := exitCodeOf(t, err); code != exitDrift {
+		t.Fatalf("TODO.md over the budget is drift, got code %d (%v)\n%s", code, err, out.String())
+	}
+	want := "TODO.md: 9500 bytes exceeds the 9000-byte session budget, so the SessionStart hook never injects it; keep open items to one line each and move narrative to DONE.md or docs/adr/"
+	if !strings.Contains(out.String(), want) {
+		t.Fatalf("missing budget drift line, got:\n%s", out.String())
+	}
+	if strings.Contains(out.String(), "TODO.md: 9500 bytes does not fit") {
+		t.Fatal("an oversized TODO.md is reported once, as drift, not also as a note")
+	}
+}
+
+func TestCheckNotesDeferredStateFile(t *testing.T) {
+	dir := initAndFill(t)
+	writeBytes(t, dir, "TODO.md", 5000)
+	writeBytes(t, dir, ".local/local.md", 5000)
+	var out, errb bytes.Buffer
+	if err := run([]string{"check", dir}, &out, &errb); err != nil {
+		t.Fatalf("a deferred non-TODO file is a soft note, got %v\n%s", err, out.String())
+	}
+	if !strings.Contains(out.String(), ".local/local.md: 5000 bytes does not fit the remaining session budget and is not injected this session") {
+		t.Fatalf("missing deferral note, got:\n%s", out.String())
+	}
+}
+
+func TestCheckSummarizesInjectionQuietly(t *testing.T) {
+	dir := initAndFill(t)
+	var out, errb bytes.Buffer
+	if err := run([]string{"check", dir}, &out, &errb); err != nil {
+		t.Fatalf("filled repo should pass, got %v\n%s", err, out.String())
+	}
+	s := out.String()
+	if !strings.Contains(s, "session state: injects ") || !strings.Contains(s, "of 9000 bytes") {
+		t.Fatalf("expected the injection summary note, got:\n%s", s)
+	}
+	if strings.Contains(s, "does not fit") || strings.Contains(s, "lines; Claude Code loads it") {
+		t.Fatalf("a small repo should get no deferral or length notes, got:\n%s", s)
+	}
+}
+
+func TestCheckNotesLongInstructionFile(t *testing.T) {
+	dir := initAndFill(t)
+	p := filepath.Join(dir, "docs", "agents.md")
+	b, _ := os.ReadFile(p)
+	b = append(b, []byte(strings.Repeat("- another rule\n", 250))...)
+	if err := os.WriteFile(p, b, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	n := strings.Count(string(b), "\n")
+	var out, errb bytes.Buffer
+	if err := run([]string{"check", dir}, &out, &errb); err != nil {
+		t.Fatalf("a long instruction file is a soft note, got %v\n%s", err, out.String())
+	}
+	want := fmt.Sprintf("docs/agents.md: %d lines; Claude Code loads it in full at launch and recommends under 200 lines per instruction file", n)
+	if !strings.Contains(out.String(), want) {
+		t.Fatalf("missing length note %q, got:\n%s", want, out.String())
 	}
 }

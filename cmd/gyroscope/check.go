@@ -428,6 +428,13 @@ func checkRepo(repoDir string, cfg config.Config) (problems, notes []string, err
 		}
 	}
 
+	// 5b. Delivery: what the Claude SessionStart hook actually injects. A hook
+	// that is installed but whose files exceed the budget delivers nothing for
+	// them, so check measures the injection, not just the hook's presence.
+	if cfg.Enforce.Claude {
+		problems, notes = appendDelivery(repoDir, paths, problems, notes)
+	}
+
 	// Archive nudge (soft, never drift): TODO.md is injected every session, so a
 	// pile of completed `[x]` items is dead per-session weight. When the state
 	// spoke is on and TODO.md carries more than the threshold, advise moving them
@@ -527,6 +534,58 @@ func checkRepo(repoDir string, cfg config.Config) (problems, notes []string, err
 	}
 
 	return problems, notes, nil
+}
+
+// instructionLineLimit is the per-file length Claude Code recommends for the
+// instruction files it loads in full at launch (CLAUDE.md and its @imports).
+const instructionLineLimit = 200
+
+// appendDelivery reports what Claude Code receives from the two channels. State:
+// PlanInjection simulates the hook over p.State; a TODO.md larger than the whole
+// budget can never be injected (drift — the resume state is lost every session),
+// any other deferred file is a soft note, and one note summarizes what fits.
+// Rules: a note for each rules file over instructionLineLimit lines.
+func appendDelivery(repoDir string, p enforce.Paths, problems, notes []string) ([]string, []string) {
+	if len(p.State) > 0 {
+		injected, deferred := enforce.PlanInjection(repoDir, p.State, enforce.StateBudget)
+		for _, d := range deferred {
+			if d.Path == "TODO.md" && d.Bytes > enforce.StateBudget {
+				problems = append(problems, fmt.Sprintf(
+					"TODO.md: %d bytes exceeds the %d-byte session budget, so the SessionStart hook never injects it; keep open items to one line each and move narrative to DONE.md or docs/adr/",
+					d.Bytes, enforce.StateBudget))
+				continue
+			}
+			notes = append(notes, fmt.Sprintf(
+				"%s: %d bytes does not fit the remaining session budget and is not injected this session", d.Path, d.Bytes))
+		}
+		total := 0
+		parts := make([]string, 0, len(injected))
+		for _, f := range injected {
+			total += f.Bytes
+			parts = append(parts, fmt.Sprintf("%s (%d)", f.Path, f.Bytes))
+		}
+		list := "nothing"
+		if len(parts) > 0 {
+			list = strings.Join(parts, ", ")
+		}
+		notes = append(notes, fmt.Sprintf("session state: injects %s — %d of %d bytes", list, total, enforce.StateBudget))
+	}
+	for _, rel := range p.Rules {
+		b, err := os.ReadFile(filepath.Join(repoDir, rel))
+		if err != nil {
+			continue // absence is reported by the planned-file check
+		}
+		n := bytes.Count(b, []byte("\n"))
+		if len(b) > 0 && b[len(b)-1] != '\n' {
+			n++
+		}
+		if n > instructionLineLimit {
+			notes = append(notes, fmt.Sprintf(
+				"%s: %d lines; Claude Code loads it in full at launch and recommends under %d lines per instruction file",
+				rel, n, instructionLineLimit))
+		}
+	}
+	return problems, notes
 }
 
 // claudeShipBlocked reports whether repoDir's root .gitignore would keep gyroscope's
