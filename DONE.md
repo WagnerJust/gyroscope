@@ -8,6 +8,40 @@
 
 **Legend:** `[x]` done
 
+## Channel split — rules by import, state by a budgeted hook (2026-10-14)
+> Problem: Claude Code caps SessionStart hook stdout at 10,000 characters (documented, not
+> configurable; past it the session gets a 2 KB preview and a file path it is never told to
+> read). Measured from session transcripts on 2026-10-14, every actively used gyroscope repo was
+> over it — this repo 9 of 9 sessions truncated, carsearchhub 118 of 120, prony 90 of 92, the
+> wiki 32 of 33 — and the standard's base payload without TODO.md is already 5.6–12 KB. `check`
+> said conformant throughout because it compared the hook string, never its output. Fix: split
+> what the hook carried into the two channels the harness provides. ADR 0022.
+- [x] **Rules reach Claude through CLAUDE.md imports** (`0b1f997`). `target.Body` gives Claude an
+  import pointer (`@AGENTS.md`, plus `@docs/agents.md` when the agents spoke is on; a stripped-at-load
+  HTML comment explains the file); the other six targets keep the routing line. A pointer byte-equal
+  to the legacy routing line is gyroscope's own output, so `init --apply` / `check --fix` upgrade it
+  in place (`convergeItem.Upgrade`, atomic overwrite); custom content stays a CONFLICT. Verified on
+  Claude Code 2.1.300 before building: a 51 KB imported spoke arrived verbatim at launch.
+- [x] **State reaches Claude through a budgeted hook** (`8321171`). `enforce.Paths{Rules, State}`
+  replaces the single path list; the Claude hook carries state only (gyroscope.json, TODO.md,
+  .local/todo.md, .local/local.md) as a one-line POSIX loop with a 9,000-byte budget
+  (`enforce.StateBudget`): a file that fits is injected under a `### <path> (<n> bytes)` header,
+  one that does not gets a one-line pointer; the `# gyroscope-hook` tag lets `Install` replace a
+  legacy or tagged entry instead of appending beside it. `PlanInjection` is the Go twin of the sh
+  loop, tied to it by an e2e test that executes the generated command. On this repo the hook now
+  prints 8,042 characters (was 12.3 KB and truncated). PI/OpenCode receive the same two lists; their
+  injection order changes once.
+- [x] **`check` measures delivery** (`af7d252`). TODO.md larger than the budget is drift (it can never
+  be injected); any other deferred state file is a note; a summary line names what is injected and
+  the total; AGENTS.md or docs/agents.md over 200 lines is a note quoting the harness guideline.
+- [x] **Docs** (`52730f7`, `7ed2445`, `340b255`, `737df1a`). ADR 0022; CONTEXT.md (pointer file,
+  routing line, SessionStart hook, new State budget term, enforcement adapter brought current); hub
+  and CONTRIBUTING managed-region prose; TODO.md template (one line per item, 9,000-byte rule);
+  README; SKILL.md (step 2, `/context` delivery check in step 5, over-budget reconcile step, `claude`
+  enforcement bullet).
+- [x] **Converged this repo** with the new binary: CLAUDE.md upgraded, hook replaced, hub and
+  CONTRIBUTING regions re-merged; `check .` conformant and the hook run end-to-end in a session.
+
 ## Cross-harness artifact sync — commands + MCP (2026-08-24)
 > Design: `.local/design/2026-08-24-cross-harness-artifact-sync-design.md`. Solves the "dev uses
 > neither gyroscope nor Claude Code" cases by extending the per-harness re-encode pattern to two new
