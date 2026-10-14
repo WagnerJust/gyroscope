@@ -4,9 +4,11 @@ Install an opinionated, self-enforcing agent-doc standard into any repo:
 an `AGENTS.md` hub routing to spokes (`CONTEXT.md`, `docs/agents.md`,
 `CONTRIBUTING.md`, `docs/adr/`, `docs/agents/`, a repo-wide `TODO.md`, and
 gitignored personal `.local/local.md` + `.local/todo.md`), the process artifacts
-Git/GitHub enforce (`.github/pull_request_template.md`, `.gitmessage`), and a
-Claude `SessionStart` hook that injects the hub + current state every session —
-so following the docs, and resuming work, isn't left to chance.
+Git/GitHub enforce (`.github/pull_request_template.md`, `.gitmessage`), and two
+Claude delivery channels: a `CLAUDE.md` that imports the hub and conventions so
+Claude Code loads them in full at launch, and a budgeted `SessionStart` hook that
+injects the current state — so following the docs, and resuming work, isn't left
+to chance.
 
 ## Install
     go install github.com/WagnerJust/gyroscope/cmd/gyroscope@latest
@@ -35,9 +37,15 @@ a spoke also prunes its hub route.
 
 ### Enforcement adapters
 
-`enforce` selects which harnesses are force-fed the hub. `claude` is on by default
-(a `SessionStart` hook in `.claude/settings.json`). `pi` (the Pi Agent Harness) is
-opt-in — enable it and re-run init:
+`enforce` selects which harnesses are force-fed the hub. `claude` is on by default:
+`CLAUDE.md` becomes an import pointer (`@AGENTS.md`, plus `@docs/agents.md`) so the
+rules load in full through Claude Code's memory channel, and a `SessionStart` hook
+in `.claude/settings.json` injects the state files (`gyroscope.json`, `TODO.md`,
+`.local/todo.md`, `.local/local.md`) in that order while they fit a 9,000-byte
+budget. Claude Code truncates hook output past 10,000 characters to a 2 KB
+preview, so anything over budget is skipped with a one-line pointer instead, and
+`gyroscope check` reports a `TODO.md` that can never fit as drift. `pi` (the Pi
+Agent Harness) is opt-in — enable it and re-run init:
 
     {"enforce": {"pi": true}}
 
