@@ -63,7 +63,7 @@ Freeze. The standard and the binary stay as they are at ADR 0022:
 - **Re-measure routing on or after 2026-11-15** from the transcripts under
   `~/.claude-personal/projects/`. If spoke opens stay under 10% of sessions in
   repos where the hub is imported in full, fold the routed spokes into
-  `docs/agents.md` or delete them, and record that as ADR 0024.
+  `docs/agents.md` or delete them, and record that in a new ADR.
 - **Guards live outside gyroscope.** Branch, push, unattended and test gates are
   Claude Code hooks and slash-command steps maintained in `~/.claude-personal`
   and `~/Side/setup`; gyroscope does not grow an enforcement layer (ADR 0004
