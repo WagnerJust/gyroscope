@@ -8,6 +8,16 @@
 
 **Legend:** `[x]` done
 
+## Freeze and the config-dir fix (2026-10-15)
+- [x] **`install-skill` honours `$CLAUDE_CONFIG_DIR`.** Default skills dir is now
+  `$CLAUDE_CONFIG_DIR/skills`, falling back to `~/.claude/skills`; the positional
+  `[skills-dir]` still overrides. Confirmed 2026-08-26 that the old default put the
+  skill in the other profile's config. `buckle install` and plumbline's
+  `install-skill --global` have the same defect; not fixed here.
+- [x] **Development frozen (ADR 0023).** The standard and binary are kept as they are
+  after the channel split; no new spokes, adapters or checks. Reasons and the
+  re-measure date are in the ADR.
+
 ## Channel split — rules by import, state by a budgeted hook (2026-10-14)
 > Problem: Claude Code caps SessionStart hook stdout at 10,000 characters (documented, not
 > configurable; past it the session gets a 2 KB preview and a file path it is never told to

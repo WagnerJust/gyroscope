@@ -14,7 +14,7 @@ to chance.
     go install github.com/WagnerJust/gyroscope/cmd/gyroscope@latest
 
 ## Use
-    gyroscope install-skill --apply      # put the /gyroscope skill in ~/.claude/skills
+    gyroscope install-skill --apply      # put the /gyroscope skill in $CLAUDE_CONFIG_DIR/skills (else ~/.claude/skills)
     # then, in your agent:  /gyroscope   # interview → writes the standard
     # or non-interactively:
     gyroscope init            # dry-run: classify each file NEW/OK/MERGE/CONFLICT
