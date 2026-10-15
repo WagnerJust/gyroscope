@@ -48,14 +48,19 @@ routing to it — `.github/pull_request_template.md` (`prTemplate`) and `.gitmes
 _Avoid:_ spoke (a spoke is hub-routed; a process artifact is applied by tooling).
 
 ### Pointer file
-A tool-specific file (`CLAUDE.md`, `GEMINI.md`) reduced to one routing line back
-to the hub, so per-tool instructions cannot drift apart.
-_Avoid:_ spoke (a pointer holds no content); hub.
+A tool-specific file (`CLAUDE.md`, `GEMINI.md`) reduced to a redirect back to the
+hub, so per-tool instructions cannot drift apart. Six carry the routing line;
+`CLAUDE.md` carries an import (`@AGENTS.md`, plus `@docs/agents.md` when the
+agents spoke is on), because Claude Code loads imported files in full at launch
+but only *decides* whether to open a file it is told about in words (see ADR 0022).
+_Avoid:_ spoke (a pointer holds no content); hub; "the routing line" for
+`CLAUDE.md` (it is an import pointer).
 
 ### Routing line
-The single canonical sentence written into every pointer file: "Before doing
-anything else, read AGENTS.md and follow its routes."
-_Avoid:_ "routing table" — the hub presents routes as a bulleted `## Routes` list.
+The single canonical sentence written into every pointer file except `CLAUDE.md`:
+"Before doing anything else, read AGENTS.md and follow its routes."
+_Avoid:_ "routing table" — the hub presents routes as a bulleted `## Routes` list;
+calling `CLAUDE.md`'s `@AGENTS.md` import a routing line (see ADR 0022).
 
 ### Doc-target registry
 `internal/target`: the registry of the *many* tools that each get a pointer file.
@@ -63,18 +68,34 @@ Kept separate from enforcement because most tools cannot run hooks.
 _Avoid:_ enforcement adapter (the other, separate registry).
 
 ### Enforcement adapter
-`internal/enforce`: an adapter for one of the *few* harnesses that can run a hook
-to make agents actually read the hub (Claude now, PI later).
+`internal/enforce`: an adapter for one of the *few* harnesses that have a native
+mechanism gyroscope can install — a hook, an extension, an always-apply rule, an
+import — to make agents actually encounter the hub and the state (Claude, PI,
+OpenCode, Codex, Cursor today).
 _Avoid:_ doc target (far more tools, pointer-only, no enforcement).
 
 ### SessionStart hook
-The Claude adapter's mechanism: a `.claude/settings.json` entry that `cat`s the
-hub + `docs/agents.md` + the state files (`TODO.md`, `.local/todo.md`) +
-`.local/local.md` into context at the start of each session, so the rules and
-current progress are present without the agent choosing to open them. `DONE.md`
-is a spoke and is routed by the hub, but is deliberately excluded from the
-cat-set — the injected files are a subset of the routed ones (see ADR 0009).
-_Avoid:_ pointer file (a hook enforces; a pointer only redirects).
+The Claude adapter's mechanism for *state*: a `.claude/settings.json` entry that
+runs a budgeted POSIX loop at the start of each session, injecting the state files
+(`gyroscope.json`, `TODO.md`, `.local/todo.md`, `.local/local.md`, in that priority
+order) while they fit the state budget, and printing a one-line pointer for each
+that does not. Rules (`AGENTS.md`, `docs/agents.md`) do not travel this way —
+Claude loads them through `CLAUDE.md`'s imports (see ADR 0022). `DONE.md` is a
+spoke and is routed by the hub, but is deliberately never injected (see ADR 0009).
+The command carries a `# gyroscope-hook` tag so a re-install replaces it rather
+than appending a second.
+_Avoid:_ pointer file (a hook enforces; a pointer only redirects); "pure cat" (it
+was, until ADR 0022); describing it as injecting the hub.
+
+### State budget
+The 9,000-byte ceiling the SessionStart hook spends on state files, in priority
+order, so its whole output stays under Claude Code's 10,000-character cap on hook
+output — past which only a 2,000-character preview arrives. `check` simulates the
+same budget: a `TODO.md` that cannot fit on its own is drift; a file deferred
+behind others is a note (see ADR 0022).
+_Avoid:_ "the cap" (that is the harness's limit; the budget is gyroscope's margin
+under it); confusing bytes (`wc -c`, what the hook counts) with characters (what
+the harness counts) — bytes are the conservative side.
 
 ### Scaffold
 A template file the binary writes verbatim: structure, sometimes with

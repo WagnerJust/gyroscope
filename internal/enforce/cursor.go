@@ -36,14 +36,14 @@ type Cursor struct{}
 
 func (Cursor) ID() string { return "cursor" }
 
-// PlanLine, Apply, Verify ignore paths: the rule is static (a Cursor rule cannot
+// PlanLine, Apply, Verify ignore the paths: the rule is static (a Cursor rule cannot
 // read files live), so it does not vary with the injected spoke set.
 
-func (Cursor) PlanLine(paths []string) string {
+func (Cursor) PlanLine(Paths) string {
 	return "write: " + cursorRulePath + " (Cursor always-apply hub rule)"
 }
 
-func (Cursor) Apply(repoDir string, paths []string) (bool, error) {
+func (Cursor) Apply(repoDir string, _ Paths) (bool, error) {
 	dest := filepath.Join(repoDir, cursorRulePath)
 	if b, err := os.ReadFile(dest); err == nil {
 		if string(b) == cursorRuleBody {
@@ -58,7 +58,7 @@ func (Cursor) Apply(repoDir string, paths []string) (bool, error) {
 	return true, nil
 }
 
-func (Cursor) Verify(repoDir string, paths []string) (bool, error) {
+func (Cursor) Verify(repoDir string, _ Paths) (bool, error) {
 	b, err := os.ReadFile(filepath.Join(repoDir, cursorRulePath))
 	if os.IsNotExist(err) {
 		return false, nil

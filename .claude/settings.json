@@ -4,7 +4,7 @@
       {
         "hooks": [
           {
-            "command": "cat AGENTS.md docs/agents.md TODO.md .local/todo.md .local/local.md gyroscope.json 2>/dev/null || true",
+            "command": "b=9000; printf '%s\\n' '## Session state (gyroscope): working files for resuming, injected within a 9000-byte budget. Repo rules live in AGENTS.md and the spokes it routes to, not here.'; for f in gyroscope.json TODO.md .local/todo.md .local/local.md; do [ -r \"$f\" ] || continue; s=$(wc -c <\"$f\" | tr -d ' '); if [ \"$s\" -le \"$b\" ]; then printf '\\n### %s (%s bytes)\\n' \"$f\" \"$s\"; cat \"$f\"; b=$((b-s)); else printf '\\n### %s: %s bytes, over the remaining session budget; not injected. Read it when resuming.\\n' \"$f\" \"$s\"; fi; done; true # gyroscope-hook",
             "type": "command"
           }
         ]

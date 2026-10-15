@@ -10,7 +10,7 @@ import (
 func TestCursorApplyWritesAlwaysApplyRule(t *testing.T) {
 	dir := t.TempDir()
 	c := Cursor{}
-	changed, err := c.Apply(dir, nil)
+	changed, err := c.Apply(dir, Paths{})
 	if err != nil || !changed {
 		t.Fatalf("first Apply: changed=%v err=%v", changed, err)
 	}
@@ -29,17 +29,17 @@ func TestCursorApplyWritesAlwaysApplyRule(t *testing.T) {
 func TestCursorApplyIsIdempotentAndVerifies(t *testing.T) {
 	dir := t.TempDir()
 	c := Cursor{}
-	if _, err := c.Apply(dir, nil); err != nil {
+	if _, err := c.Apply(dir, Paths{}); err != nil {
 		t.Fatal(err)
 	}
-	changed, err := c.Apply(dir, nil)
+	changed, err := c.Apply(dir, Paths{})
 	if err != nil {
 		t.Fatal(err)
 	}
 	if changed {
 		t.Error("second Apply should be a no-op (already current)")
 	}
-	ok, err := c.Verify(dir, nil)
+	ok, err := c.Verify(dir, Paths{})
 	if err != nil || !ok {
 		t.Fatalf("Verify after Apply: ok=%v err=%v", ok, err)
 	}
@@ -48,7 +48,7 @@ func TestCursorApplyIsIdempotentAndVerifies(t *testing.T) {
 func TestCursorVerifyFalseWhenMissingOrAltered(t *testing.T) {
 	dir := t.TempDir()
 	c := Cursor{}
-	if ok, err := c.Verify(dir, nil); err != nil || ok {
+	if ok, err := c.Verify(dir, Paths{}); err != nil || ok {
 		t.Fatalf("missing rule should verify false: ok=%v err=%v", ok, err)
 	}
 	if err := os.MkdirAll(filepath.Join(dir, ".cursor", "rules"), 0o755); err != nil {
@@ -57,7 +57,7 @@ func TestCursorVerifyFalseWhenMissingOrAltered(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(dir, cursorRulePath), []byte("---\nalwaysApply: false\n---\nedited\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if ok, _ := c.Verify(dir, nil); ok {
+	if ok, _ := c.Verify(dir, Paths{}); ok {
 		t.Error("altered rule should verify false")
 	}
 }

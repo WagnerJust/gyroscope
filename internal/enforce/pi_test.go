@@ -16,7 +16,7 @@ func TestPISatisfiesAdapter(t *testing.T) {
 
 func TestPIApplyWritesExtensionExcludingHub(t *testing.T) {
 	dir := t.TempDir()
-	paths := []string{"AGENTS.md", "docs/agents.md", "TODO.md", "gyroscope.json"}
+	paths := Paths{Rules: []string{"AGENTS.md", "docs/agents.md"}, State: []string{"gyroscope.json", "TODO.md"}}
 
 	changed, err := (PI{}).Apply(dir, paths)
 	if err != nil {
@@ -33,10 +33,9 @@ func TestPIApplyWritesExtensionExcludingHub(t *testing.T) {
 	if strings.Contains(src, `"AGENTS.md"`) {
 		t.Fatal("PI injects the non-hub spokes only; AGENTS.md is read natively and must be excluded")
 	}
-	for _, want := range []string{`"docs/agents.md"`, `"TODO.md"`, `"gyroscope.json"`} {
-		if !strings.Contains(src, want) {
-			t.Fatalf("extension PATHS should include %s, got:\n%s", want, src)
-		}
+	// Rules (minus the hub) first, then state, in order.
+	if !strings.Contains(src, `const PATHS: string[] = ["docs/agents.md","gyroscope.json","TODO.md"];`) {
+		t.Fatalf("extension PATHS should be rules-minus-hub then state, got:\n%s", src)
 	}
 	if !strings.Contains(src, "session_start") || !strings.Contains(src, "sendMessage") {
 		t.Fatal("extension should inject on session_start via sendMessage")
@@ -45,7 +44,7 @@ func TestPIApplyWritesExtensionExcludingHub(t *testing.T) {
 
 func TestPIApplyIsIdempotent(t *testing.T) {
 	dir := t.TempDir()
-	paths := []string{"AGENTS.md", "TODO.md"}
+	paths := Paths{Rules: []string{"AGENTS.md"}, State: []string{"TODO.md"}}
 	if _, err := (PI{}).Apply(dir, paths); err != nil {
 		t.Fatal(err)
 	}
@@ -60,7 +59,7 @@ func TestPIApplyIsIdempotent(t *testing.T) {
 
 func TestPIVerifyRoundTrips(t *testing.T) {
 	dir := t.TempDir()
-	paths := []string{"AGENTS.md", "TODO.md"}
+	paths := Paths{Rules: []string{"AGENTS.md"}, State: []string{"TODO.md"}}
 
 	ok, err := (PI{}).Verify(dir, paths)
 	if err != nil {
@@ -94,7 +93,7 @@ func TestPIVerifyRoundTrips(t *testing.T) {
 }
 
 func TestPIPlanLineNamesTheExtension(t *testing.T) {
-	line := (PI{}).PlanLine([]string{"AGENTS.md", "TODO.md"})
+	line := (PI{}).PlanLine(Paths{Rules: []string{"AGENTS.md"}, State: []string{"TODO.md"}})
 	if !strings.Contains(line, ".pi/extensions/gyroscope-context.ts") {
 		t.Fatalf("plan line should name the extension, got %q", line)
 	}

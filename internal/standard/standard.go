@@ -37,7 +37,7 @@ func Plan(cfg config.Config) ([]File, error) {
 		{cfg.Spokes.Contributing, "templates/CONTRIBUTING.md", "CONTRIBUTING.md"},
 		{cfg.Spokes.State, "templates/TODO.md", "TODO.md"},
 		// DONE.md is the completed-work archive — enforced + hub-routed under the
-		// same State toggle as TODO.md, but never catted by the hook (see ADR 0009).
+		// same State toggle as TODO.md, but never injected by the hook (see ADR 0009).
 		{cfg.Spokes.State, "templates/DONE.md", "DONE.md"},
 		{cfg.Spokes.State, "templates/local-todo.md", ".local/todo.md"},
 		{cfg.Spokes.Local, "templates/local.md", ".local/local.md"},

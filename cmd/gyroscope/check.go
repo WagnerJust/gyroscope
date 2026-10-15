@@ -63,9 +63,9 @@ func newCheckCmd(stdout io.Writer) *cobra.Command {
 				if err != nil {
 					return errCannotRun(err)
 				}
-				items := classify(abs, files)
+				items := classify(abs, files, cfg)
 				adapters := enabledAdapters(cfg)
-				paths := hookPathsFor(cfg)
+				paths := injectPathsFor(cfg)
 				// force=false: create NEW files, merge the hub's managed region, and
 				// leave conflicts untouched (they surface as drift in the re-check
 				// below). --fix never clobbers user content.
@@ -178,7 +178,7 @@ func archiveDone(repoDir string) (int, error) {
 }
 
 // archiveNudgeThreshold is the count of completed `[x]` items in TODO.md above
-// which check emits the archive nudge. TODO.md is catted into every session, so a
+// which check emits the archive nudge. TODO.md is injected into every session, so a
 // pile of done items is dead weight in the per-session context; past this many the
 // heuristic tells the user to move them to DONE.md. A handful is tolerated (the
 // legend line and an in-flight item's just-finished sub-tasks), so the bar is
@@ -192,7 +192,7 @@ const archiveNudgeThreshold = 5
 // (I/O, malformed settings) — a can't-run condition distinct from drift.
 //
 // It is the read-only inverse of init: it reuses standard.Plan, standard.Routes,
-// target.All/target.RoutingLine, hookPathsFor and enforce.SessionStartCommand
+// target.All/target.RoutingLine, injectPathsFor and the enforce adapters
 // rather than re-deriving any of them.
 func checkRepo(repoDir string, cfg config.Config) (problems, notes []string, err error) {
 	exists := func(rel string) bool {
@@ -374,7 +374,11 @@ func checkRepo(repoDir string, cfg config.Config) (problems, notes []string, err
 		}
 	}
 
-	// 4. Every pointer file exists and carries the canonical routing line.
+	// 4. Every pointer file exists and defers to the hub. CLAUDE.md must import it
+	// (whole `@AGENTS.md` line, plus `@docs/agents.md` when the agents spoke is on),
+	// since Claude Code skips its native AGENTS.md read once a CLAUDE.md exists;
+	// user content below the imports is allowed. Every other pointer carries the
+	// routing line.
 	for _, t := range target.All() {
 		if !exists(t.Path) {
 			problems = append(problems, fmt.Sprintf("%s: pointer file missing (run `gyroscope init`)", t.Path))
@@ -384,8 +388,17 @@ func checkRepo(repoDir string, cfg config.Config) (problems, notes []string, err
 		if err != nil {
 			return nil, nil, err
 		}
-		if !strings.Contains(string(b), target.RoutingLine) {
-			problems = append(problems, fmt.Sprintf("%s: pointer file does not contain the canonical routing line", t.Path))
+		if t.ID != "claude" {
+			if !strings.Contains(string(b), target.RoutingLine) {
+				problems = append(problems, fmt.Sprintf("%s: pointer file does not contain the canonical routing line", t.Path))
+			}
+			continue
+		}
+		lines := lineSet(string(b))
+		if _, ok := lines["@AGENTS.md"]; !ok {
+			problems = append(problems, t.Path+": pointer does not import the hub (`@AGENTS.md`); run `gyroscope check --fix` to upgrade a legacy routing-line pointer, or relocate custom content into AGENTS.md or a spoke")
+		} else if _, ok := lines["@docs/agents.md"]; cfg.Spokes.Agents && !ok {
+			problems = append(problems, t.Path+": pointer does not import the agents spoke (`@docs/agents.md`); add the line, or run `gyroscope check --fix` to upgrade a legacy routing-line pointer")
 		}
 	}
 
@@ -404,7 +417,7 @@ func checkRepo(repoDir string, cfg config.Config) (problems, notes []string, err
 	}
 
 	// 5. Every enabled enforcement adapter's mechanism is installed and current.
-	paths := hookPathsFor(cfg)
+	paths := injectPathsFor(cfg)
 	for _, a := range enabledAdapters(cfg) {
 		installed, err := a.Verify(repoDir, paths)
 		if err != nil {
@@ -413,6 +426,13 @@ func checkRepo(repoDir string, cfg config.Config) (problems, notes []string, err
 		if !installed {
 			problems = append(problems, fmt.Sprintf("enforcement adapter %q: not installed or altered (run `gyroscope init`) — %s", a.ID(), a.PlanLine(paths)))
 		}
+	}
+
+	// 5b. Delivery: what the Claude SessionStart hook actually injects. A hook
+	// that is installed but whose files exceed the budget delivers nothing for
+	// them, so check measures the injection, not just the hook's presence.
+	if cfg.Enforce.Claude {
+		problems, notes = appendDelivery(repoDir, paths, problems, notes)
 	}
 
 	// Archive nudge (soft, never drift): TODO.md is injected every session, so a
@@ -514,6 +534,58 @@ func checkRepo(repoDir string, cfg config.Config) (problems, notes []string, err
 	}
 
 	return problems, notes, nil
+}
+
+// instructionLineLimit is the per-file length Claude Code recommends for the
+// instruction files it loads in full at launch (CLAUDE.md and its @imports).
+const instructionLineLimit = 200
+
+// appendDelivery reports what Claude Code receives from the two channels. State:
+// PlanInjection simulates the hook over p.State; a TODO.md larger than the whole
+// budget can never be injected (drift — the resume state is lost every session),
+// any other deferred file is a soft note, and one note summarizes what fits.
+// Rules: a note for each rules file over instructionLineLimit lines.
+func appendDelivery(repoDir string, p enforce.Paths, problems, notes []string) ([]string, []string) {
+	if len(p.State) > 0 {
+		injected, deferred := enforce.PlanInjection(repoDir, p.State, enforce.StateBudget)
+		for _, d := range deferred {
+			if d.Path == "TODO.md" && d.Bytes > enforce.StateBudget {
+				problems = append(problems, fmt.Sprintf(
+					"TODO.md: %d bytes exceeds the %d-byte session budget, so the SessionStart hook never injects it; keep open items to one line each and move narrative to DONE.md or docs/adr/",
+					d.Bytes, enforce.StateBudget))
+				continue
+			}
+			notes = append(notes, fmt.Sprintf(
+				"%s: %d bytes does not fit the remaining session budget and is not injected this session", d.Path, d.Bytes))
+		}
+		total := 0
+		parts := make([]string, 0, len(injected))
+		for _, f := range injected {
+			total += f.Bytes
+			parts = append(parts, fmt.Sprintf("%s (%d)", f.Path, f.Bytes))
+		}
+		list := "nothing"
+		if len(parts) > 0 {
+			list = strings.Join(parts, ", ")
+		}
+		notes = append(notes, fmt.Sprintf("session state: injects %s — %d of %d bytes", list, total, enforce.StateBudget))
+	}
+	for _, rel := range p.Rules {
+		b, err := os.ReadFile(filepath.Join(repoDir, rel))
+		if err != nil {
+			continue // absence is reported by the planned-file check
+		}
+		n := bytes.Count(b, []byte("\n"))
+		if len(b) > 0 && b[len(b)-1] != '\n' {
+			n++
+		}
+		if n > instructionLineLimit {
+			notes = append(notes, fmt.Sprintf(
+				"%s: %d lines; Claude Code loads it in full at launch and recommends under %d lines per instruction file",
+				rel, n, instructionLineLimit))
+		}
+	}
+	return problems, notes
 }
 
 // claudeShipBlocked reports whether repoDir's root .gitignore would keep gyroscope's

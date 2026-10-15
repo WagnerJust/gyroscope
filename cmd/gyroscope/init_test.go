@@ -24,9 +24,9 @@ func TestInitDryRunWritesNothing(t *testing.T) {
 	if !strings.Contains(s, "dry-run") {
 		t.Fatalf("expected dry-run notice, got: %s", s)
 	}
-	// The dry-run must surface the exact hook command that runs every session.
-	if !strings.Contains(s, "cat AGENTS.md") {
-		t.Fatalf("dry-run should show the SessionStart hook command, got: %s", s)
+	// The dry-run must surface what the SessionStart hook injects every session.
+	if !strings.Contains(s, "SessionStart hook injects state within 9000 bytes: gyroscope.json TODO.md .local/todo.md .local/local.md") {
+		t.Fatalf("dry-run should summarize the SessionStart hook, got: %s", s)
 	}
 	// Default config → local spoke on → init mutates .gitignore; surface it.
 	if !strings.Contains(s, ".gitignore") {
@@ -76,7 +76,7 @@ func TestInitApplyWritesStandardPointerAndHook(t *testing.T) {
 	if err != nil {
 		t.Fatalf("read settings.json: %v", err)
 	}
-	if !strings.Contains(string(b), "SessionStart") || !strings.Contains(string(b), "cat AGENTS.md") {
+	if !strings.Contains(string(b), "SessionStart") || !strings.Contains(string(b), "# gyroscope-hook") {
 		t.Fatalf("settings.json should contain the SessionStart hook command, got: %s", b)
 	}
 }
@@ -121,10 +121,10 @@ func TestInitApplyConfigAwareHookOmitsDisabledSpoke(t *testing.T) {
 	}
 	got := string(b)
 	if strings.Contains(got, ".local/local.md") {
-		t.Fatalf("hook must not cat a disabled spoke, got: %s", got)
+		t.Fatalf("hook must not inject a disabled spoke, got: %s", got)
 	}
-	if !strings.Contains(got, "AGENTS.md") || !strings.Contains(got, "docs/agents.md") {
-		t.Fatalf("hook must cat the hub and enabled agents spoke, got: %s", got)
+	if !strings.Contains(got, "for f in gyroscope.json TODO.md .local/todo.md;") {
+		t.Fatalf("hook must inject the enabled state spokes, got: %s", got)
 	}
 }
 
@@ -349,8 +349,8 @@ func TestInitApplyRefusesConflictWithoutForce(t *testing.T) {
 	if err := run([]string{"init", dir, "--apply", "--force"}, &out, &errb); err != nil {
 		t.Fatalf("--force should resolve the conflict, got %v (%s)", err, errb.String())
 	}
-	if b, _ := os.ReadFile(filepath.Join(dir, "CLAUDE.md")); !strings.Contains(string(b), "read AGENTS.md") {
-		t.Fatal("--force should have written the canonical routing line")
+	if b, _ := os.ReadFile(filepath.Join(dir, "CLAUDE.md")); !strings.Contains(string(b), "\n@AGENTS.md\n") {
+		t.Fatal("--force should have written the canonical @import pointer")
 	}
 }
 
@@ -393,27 +393,48 @@ func TestInitSkipsPIExtensionByDefault(t *testing.T) {
 	}
 }
 
-// DONE.md is enforced (Plan/check) and hub-routed, but must NEVER be catted by
-// the SessionStart hook — the whole point of the TODO/DONE split is to keep the
-// completed archive out of the per-session injection (ADR 0009).
-func TestHookPathsNeverCatsDone(t *testing.T) {
-	if contains(hookPathsFor(config.Default()), "DONE.md") {
-		t.Fatal("hook must never cat DONE.md — the archive is routed, not injected")
+// DONE.md is enforced (Plan/check) and hub-routed, but must NEVER be injected —
+// the whole point of the TODO/DONE split is to keep the completed archive out of
+// the per-session injection (ADR 0009).
+func TestInjectPathsNeverIncludeDone(t *testing.T) {
+	p := injectPathsFor(config.Default())
+	if contains(p.Rules, "DONE.md") || contains(p.State, "DONE.md") {
+		t.Fatal("DONE.md is routed, not injected")
 	}
 }
 
-func TestHookPathsCatGyroscopeJSONWhenPersonasEnabled(t *testing.T) {
+func TestInjectPathsSplitRulesFromState(t *testing.T) {
 	cfg := config.Default() // personas unknown → enabled
-	got := hookPathsFor(cfg)
-	if !contains(got, "gyroscope.json") {
-		t.Fatalf("hook should cat gyroscope.json when personas enabled: %v", got)
+	p := injectPathsFor(cfg)
+	if want := []string{"AGENTS.md", "docs/agents.md"}; !equalStrings(p.Rules, want) {
+		t.Fatalf("Rules = %v, want %v", p.Rules, want)
+	}
+	if want := []string{"gyroscope.json", "TODO.md", ".local/todo.md", ".local/local.md"}; !equalStrings(p.State, want) {
+		t.Fatalf("State = %v, want %v", p.State, want)
 	}
 
 	cfg.Spokes.Personas = config.PersonaOff
-	got = hookPathsFor(cfg)
-	if contains(got, "gyroscope.json") {
-		t.Fatalf("hook should not cat gyroscope.json when personas off: %v", got)
+	cfg.Spokes.Agents = false
+	cfg.Spokes.Local = false
+	p = injectPathsFor(cfg)
+	if want := []string{"AGENTS.md"}; !equalStrings(p.Rules, want) {
+		t.Fatalf("Rules = %v, want %v", p.Rules, want)
 	}
+	if want := []string{"TODO.md", ".local/todo.md"}; !equalStrings(p.State, want) {
+		t.Fatalf("State = %v, want %v", p.State, want)
+	}
+}
+
+func equalStrings(a, b []string) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		if a[i] != b[i] {
+			return false
+		}
+	}
+	return true
 }
 
 func contains(ss []string, want string) bool {

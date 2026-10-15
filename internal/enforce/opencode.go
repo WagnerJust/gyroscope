@@ -19,7 +19,7 @@ import (
 //
 // Personal `.local/*` spokes are intentionally NOT injected: they are gitignored and
 // absent on a fresh clone, and OpenCode's static `instructions` has no missing-file
-// tolerance like the hook's `2>/dev/null`. So OpenCode gets the shared resume state
+// tolerance like the hook's `[ -r "$f" ] || continue`. So OpenCode gets the shared resume state
 // (TODO.md, the agents spoke, gyroscope.json); the personal `.local/todo.md` is a
 // documented gap an OpenCode user can add to their own instructions.
 
@@ -30,30 +30,29 @@ type OpenCode struct{}
 
 func (OpenCode) ID() string { return "opencode" }
 
-// opencodeInjectPaths is the non-hub, committed spoke set to force-load: drop
-// AGENTS.md (read natively) and any personal .local/ spoke (gitignored / may be
-// absent).
-func opencodeInjectPaths(paths []string) []string {
-	out := make([]string, 0, len(paths))
-	for _, p := range paths {
-		if p == "AGENTS.md" || strings.HasPrefix(p, ".local/") {
-			continue
+// opencodeInjectPaths is the non-hub, committed spoke set to force-load: the
+// rules minus AGENTS.md (read natively), then the state minus any personal
+// .local/ spoke (gitignored / may be absent).
+func opencodeInjectPaths(p Paths) []string {
+	out := withoutHub(p.Rules)
+	for _, s := range p.State {
+		if !strings.HasPrefix(s, ".local/") {
+			out = append(out, s)
 		}
-		out = append(out, p)
 	}
 	return out
 }
 
-func (OpenCode) PlanLine(paths []string) string {
-	return "merge: opencode.json instructions += " + strings.Join(opencodeInjectPaths(paths), ", ")
+func (OpenCode) PlanLine(p Paths) string {
+	return "merge: opencode.json instructions += " + strings.Join(opencodeInjectPaths(p), ", ")
 }
 
-func (OpenCode) Apply(repoDir string, paths []string) (bool, error) {
-	return setOpenCodeInstructions(repoDir, opencodeInjectPaths(paths))
+func (OpenCode) Apply(repoDir string, p Paths) (bool, error) {
+	return setOpenCodeInstructions(repoDir, opencodeInjectPaths(p))
 }
 
-func (OpenCode) Verify(repoDir string, paths []string) (bool, error) {
-	return hasOpenCodeInstructions(repoDir, opencodeInjectPaths(paths))
+func (OpenCode) Verify(repoDir string, p Paths) (bool, error) {
+	return hasOpenCodeInstructions(repoDir, opencodeInjectPaths(p))
 }
 
 // setOpenCodeInstructions ensures every path in want is present in opencode.json's

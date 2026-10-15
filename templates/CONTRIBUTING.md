@@ -52,10 +52,12 @@ A few gyroscope-specific things you may notice, and what they mean:
   nothing breaks — but the next `gyroscope check --fix` a maintainer or CI runs
   reconciles that region back to the standard, so it may overwrite your change. Put
   durable prose **outside** the fences, where it is yours to keep.
-- The root pointer files (`CLAUDE.md`, `GEMINI.md`, `.cursorrules`, `.windsurfrules`,
-  `.clinerules`, `.rules`, `.github/copilot-instructions.md`) each hold a single line
-  pointing their AI tool at `AGENTS.md`. They are redirects, not config to edit — the
-  real content lives in the hub and its spokes.
+- The root pointer files are redirects, not config to edit — the real content lives
+  in the hub and its spokes. `CLAUDE.md` holds `@AGENTS.md` (and `@docs/agents.md`)
+  import lines, which make Claude Code load those files in full at launch;
+  `GEMINI.md`, `.cursorrules`, `.windsurfrules`, `.clinerules`, `.rules` and
+  `.github/copilot-instructions.md` each hold a single line pointing their tool at
+  `AGENTS.md`.
 - `docs/agents.md` (a file) is the build/test/conventions spoke; `docs/agents/` (a
   directory) holds agent personas. Similar names, different things.
 - `gyroscope.json` records which doc spokes are enabled. Harmless to ignore.

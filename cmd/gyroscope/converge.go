@@ -61,6 +61,9 @@ type convergeItem struct {
 	Dest  string
 	State convergeState
 	Want  []byte
+	// Upgrade marks a MERGE that replaces the whole file rather than injecting a
+	// managed region: a pointer still carrying the legacy routing line.
+	Upgrade bool
 }
 
 // classify inspects every destination init would write under abs — the standard
@@ -68,15 +71,32 @@ type convergeItem struct {
 // it writes nothing. The enforcement adapters (.claude/settings.json, the PI
 // extension) are excluded here: they self-classify via their own idempotent
 // merge/verify and are never whole-file collisions.
-func classify(abs string, files []standard.File) []convergeItem {
+func classify(abs string, files []standard.File, cfg config.Config) []convergeItem {
 	items := make([]convergeItem, 0, len(files)+len(target.All()))
 	for _, f := range files {
 		items = append(items, classifyOne(abs, f.Dest, f.Content))
 	}
 	for _, t := range target.All() {
-		items = append(items, classifyOne(abs, t.Path, []byte(target.RoutingLine)))
+		items = append(items, classifyPointer(abs, t, cfg))
 	}
 	return items
+}
+
+// classifyPointer classifies a pointer file against t.Body(cfg). A pointer whose
+// bytes are exactly the legacy routing line, where the wanted body now differs
+// (CLAUDE.md's @imports), was written by gyroscope by construction: it is an
+// upgradeable MERGE rather than a CONFLICT. Any other differing pointer holds
+// user content and stays a CONFLICT.
+func classifyPointer(abs string, t target.Target, cfg config.Config) convergeItem {
+	item := classifyOne(abs, t.Path, t.Body(cfg))
+	if item.State != stateConflict {
+		return item
+	}
+	if got, err := os.ReadFile(filepath.Join(abs, t.Path)); err == nil && target.IsLegacyBody(got) {
+		item.State = stateMerge
+		item.Upgrade = true
+	}
+	return item
 }
 
 // classifyOne classifies a single destination given the bytes gyroscope would
@@ -122,7 +142,7 @@ func classifyAll(abs string, cfg config.Config) ([]convergeItem, error) {
 	if err != nil {
 		return nil, err
 	}
-	return classify(abs, files), nil
+	return classify(abs, files, cfg), nil
 }
 
 // conflicts returns the destinations classified CONFLICT — the files that need
@@ -152,7 +172,7 @@ func conflicts(items []convergeItem) []string {
 //
 // It is shared by `init --apply` and `check --fix` so detect and converge stay
 // symmetric.
-func applyConverge(stdout io.Writer, abs string, items []convergeItem, adapters []enforce.Adapter, paths []string, force bool) (skipped []string, err error) {
+func applyConverge(stdout io.Writer, abs string, items []convergeItem, adapters []enforce.Adapter, paths enforce.Paths, force bool) (skipped []string, err error) {
 	wroteLocal := false
 	for _, it := range items {
 		switch it.State {
@@ -160,6 +180,17 @@ func applyConverge(stdout io.Writer, abs string, items []convergeItem, adapters 
 			// Already current — nothing to do.
 			continue
 		case stateMerge:
+			if it.Upgrade {
+				// A legacy routing-line pointer is gyroscope's own bytes, not user
+				// content (classifyPointer matched it exactly), so replacing it whole
+				// is a sanctioned overwrite — like the persona mirror. Atomic
+				// temp+rename.
+				if err := fsutil.WriteAtomic(abs, it.Dest, it.Want); err != nil {
+					return nil, errCannotRun(err)
+				}
+				fmt.Fprintf(stdout, "upgraded %s (legacy routing line → hub @imports)\n", it.Dest)
+				break
+			}
 			// In-place managed-region injection (the hub, or any managed spoke).
 			// Atomic temp+rename.
 			if err := standard.InjectManaged(abs, it.Dest, it.Want); err != nil {

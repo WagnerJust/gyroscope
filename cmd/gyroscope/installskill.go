@@ -17,23 +17,25 @@ import (
 var lookBinary = exec.LookPath
 
 // newInstallSkillCmd installs gyroscope's own embedded skill into a skills dir
-// (default ~/.claude/skills), the way buckle installs buckle's skill.
+// (default $CLAUDE_CONFIG_DIR/skills, else ~/.claude/skills), the way buckle
+// installs buckle's skill. Claude Code reads skills from the active config dir,
+// so a work/personal split must be honoured or the skill lands in the other agent.
 func newInstallSkillCmd(stdout io.Writer) *cobra.Command {
 	var apply bool
 	cmd := &cobra.Command{
 		Use:   "install-skill [skills-dir]",
-		Short: "Install gyroscope's companion skill into your agent's skills dir (default ~/.claude/skills).",
+		Short: "Install gyroscope's companion skill into your agent's skills dir (default $CLAUDE_CONFIG_DIR/skills, else ~/.claude/skills).",
 		Args:  cobra.MaximumNArgs(1),
 		RunE: func(_ *cobra.Command, args []string) error {
 			var base string
+			var err error
 			if len(args) == 1 {
 				base = args[0]
 			} else {
-				home, err := os.UserHomeDir()
+				base, err = defaultSkillsDir()
 				if err != nil {
 					return errCannotRun(err)
 				}
-				base = filepath.Join(home, ".claude", "skills")
 			}
 			dest := filepath.Join(base, "gyroscope", "SKILL.md")
 			if !apply {
@@ -77,4 +79,17 @@ func warnIfBinaryMissing(stdout io.Writer) {
 	fmt.Fprintln(stdout, "  install step will fail until the binary is resolvable. Install it with:")
 	fmt.Fprintln(stdout, "    go install github.com/WagnerJust/gyroscope/cmd/gyroscope@latest")
 	fmt.Fprintln(stdout, "  and ensure your Go bin dir (e.g. $(go env GOPATH)/bin) is on PATH.")
+}
+
+// defaultSkillsDir is $CLAUDE_CONFIG_DIR/skills when the variable is set,
+// otherwise ~/.claude/skills.
+func defaultSkillsDir() (string, error) {
+	if dir := os.Getenv("CLAUDE_CONFIG_DIR"); dir != "" {
+		return filepath.Join(dir, "skills"), nil
+	}
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return "", err
+	}
+	return filepath.Join(home, ".claude", "skills"), nil
 }
